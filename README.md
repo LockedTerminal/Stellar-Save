@@ -49,7 +49,7 @@ For detailed architecture documentation, see [docs/architecture.md](docs/archite
 
 To get started quickly, follow the dedicated setup guides for each component of the Stellar-Save monorepo:
 
-- 🚀 **Smart Contracts**: See [contracts/stellar-save/src/lib.rs](contracts/stellar-save/src/lib.rs) and the [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for smart contract API documentation.
+- 🚀 **Smart Contracts**: See [contracts/stellar-save/src/lib.rs](contracts/stellar-save/src/lib.rs) and the [QUICK_REFERENCE.md](docs/reference/quick-reference.md) for smart contract API documentation.
 - 💻 **Frontend Web App**: See [frontend/README.md](frontend/README.md) for React/TypeScript setup, environment configuration (`VITE_*`), MUI theme tokens, and local development commands.
 - 📱 **Mobile Application**: See [mobile/README.md](mobile/README.md) for Expo React Native setup, iOS/Android emulator instructions, and mobile architecture.
 - 🛠️ **Scripts & Tooling**: See [scripts/README.md](scripts/README.md) for build (`build.sh`), test (`test.sh`), and deployment (`deploy_testnet.sh`, `deploy_mainnet.sh`) scripts.
