@@ -371,9 +371,34 @@ describe('Config - Startup Validation Behavior', () => {
     expect(config.nodeEnv).toBeDefined();
   });
 
-  it('should provide helpful error messages on validation failure', () => {
-    // Validation failures write structured JSON to stderr
-    // This is tested indirectly by checking that invalid configs cause module load failure
-    expect.assertions(0);
+  it('should format validation errors with clear readable messages naming the variable', async () => {
+    const { formatValidationErrors, envSchema } = await import('../config');
+    const parsed = envSchema.safeParse({ PORT: 'not-a-number' });
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      const formatted = formatValidationErrors(parsed.error.issues);
+      expect(formatted.length).toBeGreaterThan(0);
+      expect(formatted[0]).toContain('PORT');
+    }
+  });
+
+  it('should throw an error naming the invalid variable on validation failure', async () => {
+    const { validateConfig } = await import('../config');
+    const stderrSpy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    expect(() => {
+      validateConfig({ PORT: 'invalid-port' } as unknown as NodeJS.ProcessEnv);
+    }).toThrow(/Invalid environment configuration:.*PORT/);
+
+    stderrSpy.mockRestore();
+  });
+
+  it('should update sensitive secret in memory via updateConfigSecret', async () => {
+    const { config, updateConfigSecret } = await import('../config');
+    updateConfigSecret('JWT_SECRET', 'a'.repeat(32));
+    expect(config.auth.jwtSecret).toBe('a'.repeat(32));
+
+    updateConfigSecret('ADMIN_SECRET', 'new-admin-secret-val');
+    expect(config.admin.secret).toBe('new-admin-secret-val');
   });
 });

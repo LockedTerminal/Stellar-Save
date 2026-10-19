@@ -15,6 +15,7 @@ import {
   DescribeSecretCommand,
 } from '@aws-sdk/client-secrets-manager';
 
+import { config } from './config';
 import { logger } from './logger';
 
 // Types for Lambda event
@@ -36,7 +37,7 @@ interface RotationContext {
 
 // Initialize Secrets Manager client
 const client = new SecretsManagerClient({
-  region: process.env.AWS_REGION || 'us-east-1',
+  region: config.aws.region,
 });
 
 /**
@@ -274,10 +275,7 @@ function generateNewSecretValue(secretId: string, _currentValue: string): string
 /**
  * Update the service with the new secret
  */
-async function updateServiceWithNewSecret(
-  secretId: string,
-  _newValue: string
-): Promise<void> {
+async function updateServiceWithNewSecret(secretId: string, _newValue: string): Promise<void> {
   // This is where you'd implement service-specific logic
   // For example:
   // - Update database user password

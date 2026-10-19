@@ -17,7 +17,7 @@ import {
   TagResourceCommand,
 } from '@aws-sdk/client-secrets-manager';
 
-import { config } from './config';
+import { config, updateConfigSecret } from './config';
 import { logger } from './logger';
 
 export interface SecretMetadata {
@@ -43,7 +43,12 @@ export interface RotationConfig {
 export interface SecretsManagerServiceDeps {
   client?: SecretsManagerClient;
   config?: { aws: { region: string; accessKeyId?: string; secretAccessKey?: string } };
-  logger?: { info: (...a: unknown[]) => void; error: (...a: unknown[]) => void; warn: (...a: unknown[]) => void; debug: (...a: unknown[]) => void };
+  logger?: {
+    info: (...a: unknown[]) => void;
+    error: (...a: unknown[]) => void;
+    warn: (...a: unknown[]) => void;
+    debug: (...a: unknown[]) => void;
+  };
 }
 
 export class SecretsManagerService {
@@ -378,18 +383,21 @@ export async function initializeSecrets(): Promise<void> {
   logger.info('Initializing secrets from AWS Secrets Manager');
 
   // List of secrets to initialize
-  const secretConfigs = [
-    { name: 'stellar-save/jwt-secret', envVar: 'JWT_SECRET' },
-    { name: 'stellar-save/admin-secret', envVar: 'ADMIN_SECRET' },
-    { name: 'stellar-save/db-password', envVar: 'DB_PASSWORD' },
+  const secretConfigs: Array<{
+    name: string;
+    key: 'JWT_SECRET' | 'ADMIN_SECRET' | 'DB_PASSWORD';
+  }> = [
+    { name: 'stellar-save/jwt-secret', key: 'JWT_SECRET' },
+    { name: 'stellar-save/admin-secret', key: 'ADMIN_SECRET' },
+    { name: 'stellar-save/db-password', key: 'DB_PASSWORD' },
   ];
 
-  for (const { name, envVar } of secretConfigs) {
+  for (const { name, key } of secretConfigs) {
     try {
       const secret = await secretsManager.getSecret(name);
 
-      // Override environment variable with secret from AWS
-      process.env[envVar] = secret.value;
+      // Override configuration secret in memory without touching process.env
+      updateConfigSecret(key, secret.value);
 
       logger.info('Secret loaded from AWS', { secretName: name });
     } catch (error) {
