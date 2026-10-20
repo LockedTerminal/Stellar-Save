@@ -29,7 +29,9 @@ const transports: winston.transport[] = [
     stderrLevels: ['error'],
   }),
   // Rotating file transport — one file per day, keep 14 days
-  new (winston.transports as any).DailyRotateFile({
+  new (
+    winston.transports as unknown as { DailyRotateFile: new (opts: unknown) => winston.transport }
+  ).DailyRotateFile({
     filename: 'logs/app-%DATE%.log',
     datePattern: 'YYYY-MM-DD',
     maxFiles: '14d',
@@ -151,12 +153,18 @@ if (config.nodeEnv !== 'test') {
 }
 
 // ── Lazy prisma import — avoids circular dep (logger ← prisma_client ← logger) ─
-let _prisma: any = null;
-async function getPrisma(): Promise<any> {
+type AuditPrisma = {
+  auditLog: {
+    create: (args: { data: Record<string, unknown> }) => Promise<unknown>;
+  };
+};
+
+let _prisma: AuditPrisma | null = null;
+async function getPrisma(): Promise<AuditPrisma | null> {
   if (!_prisma) {
     try {
       const { prisma } = await import('../prisma_client');
-      _prisma = prisma;
+      _prisma = prisma as unknown as AuditPrisma;
     } catch {
       // prisma_client unavailable; audit logging silently skipped
     }

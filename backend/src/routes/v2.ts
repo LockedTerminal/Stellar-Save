@@ -83,8 +83,12 @@ export function createV2Router(services: V1Services): Router {
         const joinToken = randomBytes(32).toString('hex');
 
         // Persist invitation in DB
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const invitation = await (prisma as any).groupInvitation.create({
+        const db = prisma as unknown as {
+          groupInvitation: {
+            create: (args: unknown) => Promise<{ id: string }>;
+          };
+        };
+        const invitation = await db.groupInvitation.create({
           data: {
             groupId,
             recipientEmail: email,
@@ -103,13 +107,12 @@ export function createV2Router(services: V1Services): Router {
         const templateKey = 'email_group_invitation';
         const subject = 'You are invited to join {{groupName}}';
 
-        const emailData = {
+        const emailData: Record<string, unknown> = {
           userName: email,
           groupName,
           joinLink,
           creatorUserId,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any;
+        };
 
         await notificationService.sendEmail(
           email,
@@ -126,10 +129,8 @@ export function createV2Router(services: V1Services): Router {
           })
         );
       } catch (err: unknown) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const error = err as any;
         logger.error('Failed to send group invitation', {
-          error: error?.message || String(err),
+          error: err instanceof Error ? err.message : String(err),
         });
         next(new AppError('GROUP_INVITATION_FAILED', 'Failed to send invitation', 500));
       }

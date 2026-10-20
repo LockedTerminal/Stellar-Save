@@ -155,8 +155,8 @@ export async function sendContributionReminder(
       orderBy: { timestamp: 'desc' },
     });
 
-    const groupData = (groupEvent?.data as Record<string, any>) ?? {};
-    const groupName: string = groupData.name ?? `Group ${groupId.slice(0, 8)}`;
+    const groupData = (groupEvent?.data as Record<string, unknown>) ?? {};
+    const groupName: string = (groupData.name as string) ?? `Group ${groupId.slice(0, 8)}`;
     const amount: string = String(groupData.contribution_amount ?? '—');
     const cycleNumber: string = String(groupData.current_cycle ?? '—');
 
@@ -340,17 +340,17 @@ export async function processDueReminders(batchSize = 50): Promise<number> {
       data: { status: 'processing' },
     });
 
-    const data = job.templateData as Record<string, any>;
-    const window = (data.window ?? '24h') as ReminderWindow;
-    const deadline = new Date(data.deadline);
+    const data = (job.templateData as Record<string, unknown>) ?? {};
+    const window = ((data.window as string) ?? '24h') as ReminderWindow;
+    const deadline = new Date(String(data.deadline));
 
     const member: Member = {
       userId: job.userId,
       email: job.recipient,
-      name: data.memberName ?? job.recipient,
+      name: (data.memberName as string) ?? job.recipient,
     };
 
-    const result = await sendContributionReminder(member, data.groupId, deadline, window);
+    const result = await sendContributionReminder(member, String(data.groupId), deadline, window);
 
     await prisma.notificationQueue.update({
       where: { id: job.id },

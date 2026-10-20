@@ -24,11 +24,7 @@
  * back gracefully and log a warning rather than crashing.
  */
 
-import {
-  Contract,
-  xdr,
-  scValToNative,
-} from '@stellar/stellar-sdk';
+import { Contract, xdr, scValToNative } from '@stellar/stellar-sdk';
 import { Gauge, Counter } from 'prom-client';
 
 import { GroupStateCache } from './lib/cache';
@@ -38,7 +34,6 @@ import { logger } from './logger';
 import { circuitBreakerFallbacksTotal, cacheStaleReadsTotal } from './metrics';
 import { registry } from './metrics';
 import { prisma } from './prisma_client';
-
 
 // ── Prometheus metrics ─────────────────────────────────────────────────────
 
@@ -224,7 +219,7 @@ export class ReconciliationService {
     const take = this.cfg.sampleSize > 0 ? this.cfg.sampleSize : 10_000;
 
     // Extract distinct groupIds from recent event data payloads
-    const events = await (prisma as any).contractEvent.findMany({
+    const events = await prisma.contractEvent.findMany({
       orderBy: { timestamp: 'desc' },
       take: take * 10, // over-fetch to get enough distinct groups
       select: { data: true },
@@ -254,7 +249,7 @@ export class ReconciliationService {
     const drifted: DriftRecord[] = [];
 
     // DB: latest contribution-related event for this group
-    const dbEvent = await (prisma as any).contractEvent.findFirst({
+    const dbEvent = await prisma.contractEvent.findFirst({
       where: { data: { path: ['groupId'], equals: groupId } },
       orderBy: { timestamp: 'desc' },
     });
@@ -313,9 +308,13 @@ export class ReconciliationService {
         const tx = {
           operations: [op],
           sourceAccount: this.cfg.contractId,
-        } as any;
+        };
 
-        const sim = await (client as any).simulateTransaction(tx);
+        const sim = await (
+          client as unknown as {
+            simulateTransaction: (t: unknown) => Promise<{ result?: { retval?: xdr.ScVal } }>;
+          }
+        ).simulateTransaction(tx);
         if (!sim?.result?.retval) return null;
 
         return scValToNative(sim.result.retval) as Record<string, unknown>;
@@ -353,7 +352,7 @@ export class ReconciliationService {
    */
   private async heal(record: DriftRecord): Promise<boolean> {
     try {
-      const latest = await (prisma as any).contractEvent.findFirst({
+      const latest = await prisma.contractEvent.findFirst({
         where: { data: { path: ['groupId'], equals: record.groupId } },
         orderBy: { timestamp: 'desc' },
       });
@@ -365,7 +364,7 @@ export class ReconciliationService {
         [record.field]: record.onChainValue,
       };
 
-      await (prisma as any).contractEvent.update({
+      await prisma.contractEvent.update({
         where: { id: latest.id },
         data: { data: updatedData },
       });

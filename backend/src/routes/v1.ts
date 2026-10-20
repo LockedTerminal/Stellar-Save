@@ -2,33 +2,42 @@ import { Router } from 'express';
 import { format as fastCsvFormat } from 'fast-csv';
 
 import { AdminService } from '../admin_service';
-import { createAnalyticsMiddlewareStack, createAnalyticsCacheMiddleware } from '../analytics_middleware';
+import {
+  createAnalyticsMiddlewareStack,
+  createAnalyticsCacheMiddleware,
+} from '../analytics_middleware';
 import { apiKeyAuthMiddleware, recordApiUsage } from '../api_key_rate_limiter';
 import { apiKeyService } from '../api_key_service';
-import { adminAuthMiddleware } from '../modules/auth/auth_middleware';
 import { toContractEventDTO } from '../dto';
+import { AppError } from '../lib/errors';
+import { parseOffsetParams, paginate, paginateArray } from '../lib/pagination';
+import { validateBody, validateQuery, validateParams, schemas } from '../lib/validation';
+import { logger } from '../logger';
+import { adminAuthMiddleware } from '../modules/auth/auth_middleware';
+import { readinessCheckCache } from '../redis';
 import { createGovernanceRouter } from './governance';
 import { createInsuranceRouter } from './insurance';
 import { createNotificationRouter } from './notifications';
 import { createSseRouter } from './sse';
-import { AppError } from '../lib/errors';
-import { parseOffsetParams, paginate, paginateArray } from '../lib/pagination';
-import { validateBody, validateQuery, validateParams, schemas } from '../lib/validation';
-import { readinessCheckCache } from '../redis';
-import { logger } from '../logger';
 
 import type { AnalyticsService } from '../analytics_service';
 import type { BackupMonitor } from '../backup_monitor';
 import type { BackupRestoreDrill } from '../backup_restore_drill';
 import type { BackupScheduler } from '../backup_scheduler';
-import type { BackupService} from '../backup_service';
+import type { BackupService } from '../backup_service';
 import type { ContractEventIndexer } from '../contract_event_indexer';
 import type { ExportService } from '../export_service';
 import type { FeedbackService } from '../feedback_service';
-import type { UserPreference } from '../models';
 import type { RecommendationEngine } from '../recommendation';
 import type { RecoveryService } from '../recovery_service';
-import type { NextFunction } from 'express';
+import type { Request, Response, NextFunction } from 'express';
+
+interface V1Request extends Request {
+  validatedQuery?: Record<string, unknown>;
+  validatedBody?: Record<string, unknown>;
+  validatedParams?: Record<string, unknown>;
+  apiKey?: { keyId: string; userId?: string };
+}
 
 // ── Shared service instances (passed in from app) ────────────────────────────
 export interface V1Services {
@@ -71,10 +80,10 @@ export function createV1Router(services: V1Services): Router {
     analyticsMiddleware.readRateLimit,
     statsGroupsCache,
     validateQuery(schemas.analyticsDateQuery),
-    async (req: any, res, next) => {
+    async (req: V1Request, res, next) => {
       try {
-        const { date } = req.validatedQuery || {};
-        const targetDate = date ? new Date(date) : new Date();
+        const { date } = (req.validatedQuery || {}) as { date?: string };
+        const _targetDate = date ? new Date(date) : new Date();
         const stats = await analyticsService.getGroupsOverviewStats();
         res.json(stats);
       } catch (error) {
@@ -97,8 +106,8 @@ export function createV1Router(services: V1Services): Router {
   router.use('/governance', createGovernanceRouter());
 
   // Search
-  router.get('/search', validateQuery(schemas.searchQuery), async (req: any, res, next) => {
-    const { q } = req.validatedQuery;
+  router.get('/search', validateQuery(schemas.searchQuery), async (req: V1Request, res, next) => {
+    const { q } = (req.validatedQuery ?? {}) as { q: string };
     try {
       const { SearchService } = await import('../search');
       const searchService = new SearchService();
@@ -109,39 +118,35 @@ export function createV1Router(services: V1Services): Router {
     }
   });
 
-  router.get('/search/autocomplete', validateQuery(schemas.searchQuery), async (req: any, res, next) => {
-    const { q } = req.validatedQuery;
-    try {
-      const { SearchService } = await import('../search');
-      const searchService = new SearchService();
-      res.json(await searchService.autocomplete(q));
-    } catch (error) {
-      logger.error('Autocomplete failed', { error: String(error) });
-      next(new AppError('SEARCH_FAILED', 'Autocomplete failed', 500));
+  router.get(
+    '/search/autocomplete',
+    validateQuery(schemas.searchQuery),
+    async (req: V1Request, res, next) => {
+      const { q } = (req.validatedQuery ?? {}) as { q: string };
+      try {
+        const { SearchService } = await import('../search');
+        const searchService = new SearchService();
+        res.json(await searchService.autocomplete(q));
+      } catch (error) {
+        logger.error('Autocomplete failed', { error: String(error) });
+        next(new AppError('SEARCH_FAILED', 'Autocomplete failed', 500));
+      }
     }
-  });
+  );
 
   // Preferences
-  router.post(
-    '/preferences',
-    validateBody(schemas.userPreferenceUpdate),
-    (req, res, next) => {
-      const pref = req.body;
-      engine.setPreference(pref);
-      res.status(200).json({ message: 'Preferences updated' });
-    }
-  );
+  router.post('/preferences', validateBody(schemas.userPreferenceUpdate), (req, res, _next) => {
+    const pref = req.body;
+    engine.setPreference(pref);
+    res.status(200).json({ message: 'Preferences updated' });
+  });
 
   // Recommendations
-  router.get(
-    '/recommendations/:userId',
-    validateParams(schemas.userIdParam),
-    (req, res) => {
-      const { userId } = req.params;
-      const recommendations = engine.getRecommendations(userId, 'collaborative');
-      res.json({ userId, algorithm: 'collaborative', recommendations });
-    }
-  );
+  router.get('/recommendations/:userId', validateParams(schemas.userIdParam), (req, res) => {
+    const { userId } = req.params;
+    const recommendations = engine.getRecommendations(userId, 'collaborative');
+    res.json({ userId, algorithm: 'collaborative', recommendations });
+  });
 
   // Health
   router.get('/health', (req, res) => {
@@ -188,29 +193,21 @@ export function createV1Router(services: V1Services): Router {
     }
   });
 
-  router.get(
-    '/export/:jobId',
-    validateParams(schemas.jobIdParam),
-    (req, res, next) => {
-      const { jobId } = req.params;
-      const job = exportService.getJob(jobId);
-      if (!job) return next(new AppError('NOT_FOUND', 'Job not found', 404));
-      res.json(job);
-    }
-  );
+  router.get('/export/:jobId', validateParams(schemas.jobIdParam), (req, res, next) => {
+    const { jobId } = req.params;
+    const job = exportService.getJob(jobId);
+    if (!job) return next(new AppError('NOT_FOUND', 'Job not found', 404));
+    res.json(job);
+  });
 
-  router.get(
-    '/export/:jobId/download',
-    validateParams(schemas.jobIdParam),
-    (req, res, next) => {
-      const { jobId } = req.params;
-      const job = exportService.getJob(jobId);
-      if (!job) return next(new AppError('NOT_FOUND', 'Job not found', 404));
-      if (job.status !== 'completed')
-        return next(new AppError('JOB_NOT_COMPLETE', 'Job is not completed yet', 400));
-      res.json({ url: job.fileUrl });
-    }
-  );
+  router.get('/export/:jobId/download', validateParams(schemas.jobIdParam), (req, res, next) => {
+    const { jobId } = req.params;
+    const job = exportService.getJob(jobId);
+    if (!job) return next(new AppError('NOT_FOUND', 'Job not found', 404));
+    if (job.status !== 'completed')
+      return next(new AppError('JOB_NOT_COMPLETE', 'Job is not completed yet', 400));
+    res.json({ url: job.fileUrl });
+  });
 
   // Backup
   router.post('/backup', validateBody(schemas.backupTrigger), async (req, res, next) => {
@@ -242,34 +239,26 @@ export function createV1Router(services: V1Services): Router {
     res.json({ acknowledged: true });
   });
 
-  router.get(
-    '/backup/:jobId',
-    validateParams(schemas.jobIdParam),
-    (req, res, next) => {
-      const { jobId } = req.params;
-      const job = backupService.getJob(jobId);
-      if (!job) return next(new AppError('NOT_FOUND', 'Backup job not found', 404));
-      res.json(job);
-    }
-  );
+  router.get('/backup/:jobId', validateParams(schemas.jobIdParam), (req, res, next) => {
+    const { jobId } = req.params;
+    const job = backupService.getJob(jobId);
+    if (!job) return next(new AppError('NOT_FOUND', 'Backup job not found', 404));
+    res.json(job);
+  });
 
-  router.post(
-    '/backup/restore',
-    validateBody(schemas.backupRestore),
-    async (req, res, next) => {
-      try {
-        const { jobId } = req.body;
-        const result = jobId
-          ? await recoveryService.restore(jobId)
-          : await recoveryService.restoreLatest();
-        res.json(result);
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        logger.error('Backup restore failed', { error: message });
-        next(new AppError('RESTORE_FAILED', message, 400));
-      }
+  router.post('/backup/restore', validateBody(schemas.backupRestore), async (req, res, next) => {
+    try {
+      const { jobId } = req.body;
+      const result = jobId
+        ? await recoveryService.restore(jobId)
+        : await recoveryService.restoreLatest();
+      res.json(result);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error('Backup restore failed', { error: message });
+      next(new AppError('RESTORE_FAILED', message, 400));
     }
-  );
+  });
 
   router.post(
     '/backup/alerts/:alertId/acknowledge',
@@ -307,11 +296,20 @@ export function createV1Router(services: V1Services): Router {
   router.get(
     '/events',
     validateQuery(schemas.eventsFilterQuery),
-    async (req: any, res, next) => {
+    async (req: V1Request, res, next) => {
       try {
         const { contractId, eventType, startLedger, endLedger, startTime, endTime, limit, offset } =
-          req.validatedQuery;
-        const options: any = {};
+          (req.validatedQuery ?? {}) as {
+            contractId?: string;
+            eventType?: string;
+            startLedger?: number;
+            endLedger?: number;
+            startTime?: string;
+            endTime?: string;
+            limit?: number;
+            offset?: number;
+          };
+        const options: Record<string, unknown> = {};
         if (contractId) options.contractId = contractId;
         if (eventType) options.eventType = eventType;
         if (startLedger !== undefined) options.startLedger = startLedger;
@@ -321,12 +319,24 @@ export function createV1Router(services: V1Services): Router {
         options.limit = limit;
         options.offset = offset;
 
-        const result = await eventIndexer.getEvents(options);
-        const items: any[] = Array.isArray(result) ? result : ((result as any).events ?? []);
+        const result = await eventIndexer.getEvents(
+          options as Parameters<typeof eventIndexer.getEvents>[0]
+        );
+        const items: unknown[] = Array.isArray(result)
+          ? result
+          : ((result as { events?: unknown[] }).events ?? []);
         const total: number = Array.isArray(result)
           ? items.length
-          : ((result as any).total ?? items.length);
-        res.json(paginate(items.map(toContractEventDTO), total, { limit, offset }));
+          : ((result as { total?: number }).total ?? items.length);
+        res.json(
+          paginate(
+            items.map((item) =>
+              toContractEventDTO(item as Parameters<typeof toContractEventDTO>[0])
+            ),
+            total,
+            { limit, offset }
+          )
+        );
       } catch (error) {
         logger.error('Error fetching events', { error: String(error) });
         next(new AppError('EVENTS_FETCH_FAILED', 'Failed to fetch events', 500));
@@ -337,20 +347,33 @@ export function createV1Router(services: V1Services): Router {
   router.get('/events/stats', async (req, res, next) => {
     try {
       const { contractId } = req.query;
-      const totalEvents = await (eventIndexer as any).prisma.contractEvent.count({
+      interface EventIndexerDb {
+        prisma: {
+          contractEvent: {
+            count: (args: unknown) => Promise<number>;
+            groupBy: (
+              args: unknown
+            ) => Promise<Array<{ eventType: string; _count: { eventType: number } }>>;
+          };
+        };
+      }
+      const indexerDb = eventIndexer as unknown as EventIndexerDb;
+      const totalEvents = await indexerDb.prisma.contractEvent.count({
         where: contractId ? { contractId: contractId as string } : {},
       });
-      const eventTypes = await (eventIndexer as any).prisma.contractEvent.groupBy({
+      const eventTypes = await indexerDb.prisma.contractEvent.groupBy({
         by: ['eventType'],
         where: contractId ? { contractId: contractId as string } : {},
         _count: { eventType: true },
       });
       res.json({
         totalEvents,
-        eventTypeBreakdown: eventTypes.map((type: any) => ({
-          type: type.eventType,
-          count: type._count.eventType,
-        })),
+        eventTypeBreakdown: eventTypes.map(
+          (type: { eventType: string; _count: { eventType: number } }) => ({
+            type: type.eventType,
+            count: type._count.eventType,
+          })
+        ),
       });
     } catch (error) {
       logger.error('Error fetching event stats', { error: String(error) });
@@ -365,9 +388,9 @@ export function createV1Router(services: V1Services): Router {
     analyticsMiddleware.readRateLimit,
     analyticsMiddleware.cache,
     validateQuery(schemas.analyticsDateQuery),
-    async (req: any, res, next) => {
+    async (req: V1Request, res, next) => {
       try {
-        const { date } = req.validatedQuery || {};
+        const { date } = (req.validatedQuery || {}) as { date?: string };
         const targetDate = date ? new Date(date) : new Date();
         const stats = await analyticsService.getPlatformStats(targetDate);
         if (!stats)
@@ -409,10 +432,10 @@ export function createV1Router(services: V1Services): Router {
     analyticsMiddleware.cache,
     validateParams(schemas.userIdParam),
     validateQuery(schemas.analyticsDateQuery),
-    async (req: any, res, next) => {
+    async (req: V1Request, res, next) => {
       try {
         const { userId } = req.params;
-        const { date } = req.validatedQuery || {};
+        const { date } = (req.validatedQuery || {}) as { date?: string };
         const targetDate = date ? new Date(date) : new Date();
         const stats = await analyticsService.getUserStats(userId, targetDate);
         if (!stats)
@@ -431,10 +454,10 @@ export function createV1Router(services: V1Services): Router {
     analyticsMiddleware.cache,
     validateParams(schemas.groupIdParam),
     validateQuery(schemas.analyticsDateQuery),
-    async (req: any, res, next) => {
+    async (req: V1Request, res, next) => {
       try {
         const { groupId } = req.params;
-        const { date } = req.validatedQuery || {};
+        const { date } = (req.validatedQuery || {}) as { date?: string };
         const targetDate = date ? new Date(date) : new Date();
         const stats = await analyticsService.getGroupStats(groupId, targetDate);
         if (!stats)
@@ -452,9 +475,14 @@ export function createV1Router(services: V1Services): Router {
     analyticsMiddleware.readRateLimit,
     analyticsMiddleware.cache,
     validateQuery(schemas.paginationWithDateRange),
-    async (req: any, res, next) => {
+    async (req: V1Request, res, next) => {
       try {
-        const { startDate, endDate, limit, offset } = req.validatedQuery;
+        const { startDate, endDate, limit, offset } = (req.validatedQuery ?? {}) as {
+          startDate?: string;
+          endDate?: string;
+          limit?: number;
+          offset?: number;
+        };
         const eventStats = await analyticsService.getEventStats({
           startDate: startDate ? new Date(startDate) : undefined,
           endDate: endDate ? new Date(endDate) : undefined,
@@ -522,10 +550,10 @@ export function createV1Router(services: V1Services): Router {
     analyticsMiddleware.readRateLimit,
     analyticsMiddleware.cache,
     validateQuery(schemas.paginationQuery),
-    async (req: any, res, next) => {
+    async (req: V1Request, res, next) => {
       try {
         const { reportType } = req.query;
-        const { limit, offset } = req.validatedQuery;
+        const { limit, offset } = (req.validatedQuery ?? {}) as { limit?: number; offset?: number };
         const reports = await analyticsService.getReports(reportType as string, {
           limit,
           offset,
@@ -596,7 +624,7 @@ export function createV1Router(services: V1Services): Router {
         headers: ['date', 'group_id', 'type', 'amount', 'transaction_hash'],
       });
 
-      csvStream.on('error', (err: any) => {
+      csvStream.on('error', (err: unknown) => {
         logger.error('CSV stream error', { error: String(err) });
         if (!res.headersSent) res.status(500).end();
       });
@@ -641,31 +669,43 @@ export function createV1Router(services: V1Services): Router {
     }
   });
 
-  router.patch('/admin/users/:id', adminAuthMiddleware, validateParams(schemas.idParam), validateBody(schemas.adminUserUpdate), async (req: any, res, next) => {
-    try {
-      const { id } = req.params;
-      const { updates, adminId } = req.body;
-      const updated = adminService.updateUser(id, updates, adminId);
-      if (!updated) return next(new AppError('NOT_FOUND', 'User not found', 404));
-      res.json(updated);
-    } catch (error) {
-      logger.error('Failed to update user', { error: String(error) });
-      next(new AppError('ADMIN_UPDATE_FAILED', 'Failed to update user', 500));
+  router.patch(
+    '/admin/users/:id',
+    adminAuthMiddleware,
+    validateParams(schemas.idParam),
+    validateBody(schemas.adminUserUpdate),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { id } = req.params;
+        const { updates, adminId } = req.body;
+        const updated = adminService.updateUser(id, updates, adminId);
+        if (!updated) return next(new AppError('NOT_FOUND', 'User not found', 404));
+        res.json(updated);
+      } catch (error) {
+        logger.error('Failed to update user', { error: String(error) });
+        next(new AppError('ADMIN_UPDATE_FAILED', 'Failed to update user', 500));
+      }
     }
-  });
+  );
 
-  router.delete('/admin/users/:id', adminAuthMiddleware, validateParams(schemas.idParam), validateBody(schemas.adminUserDelete), async (req: any, res, next) => {
-    try {
-      const { id } = req.params;
-      const { adminId } = req.body;
-      const deleted = adminService.deleteUser(id, adminId);
-      if (!deleted) return next(new AppError('NOT_FOUND', 'User not found', 404));
-      res.json({ message: 'User deleted successfully' });
-    } catch (error) {
-      logger.error('Failed to delete user', { error: String(error) });
-      next(new AppError('ADMIN_DELETE_FAILED', 'Failed to delete user', 500));
+  router.delete(
+    '/admin/users/:id',
+    adminAuthMiddleware,
+    validateParams(schemas.idParam),
+    validateBody(schemas.adminUserDelete),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { id } = req.params;
+        const { adminId } = req.body;
+        const deleted = adminService.deleteUser(id, adminId);
+        if (!deleted) return next(new AppError('NOT_FOUND', 'User not found', 404));
+        res.json({ message: 'User deleted successfully' });
+      } catch (error) {
+        logger.error('Failed to delete user', { error: String(error) });
+        next(new AppError('ADMIN_DELETE_FAILED', 'Failed to delete user', 500));
+      }
     }
-  });
+  );
 
   router.get('/admin/groups', adminAuthMiddleware, async (req, res, next) => {
     try {
@@ -678,20 +718,28 @@ export function createV1Router(services: V1Services): Router {
     }
   });
 
-  router.post('/admin/groups/:id/flag', adminAuthMiddleware, validateParams(schemas.idParam), validateBody(schemas.adminGroupFlag), async (req: any, res, next) => {
-    try {
-      const { id } = req.params;
-      const { flagged, adminId } = req.body;
-      const { mockGroups } = await import('../mock_data');
-      const group = mockGroups.find((g: any) => g.id === id);
-      if (!group) return next(new AppError('NOT_FOUND', 'Group not found', 404));
-      adminService.logAction(adminId, 'FLAG_GROUP', id, 'Group', { flagged });
-      res.json({ ...group, flagged });
-    } catch (error) {
-      logger.error('Failed to flag group', { error: String(error) });
-      next(new AppError('ADMIN_UPDATE_FAILED', 'Failed to flag group', 500));
+  router.post(
+    '/admin/groups/:id/flag',
+    adminAuthMiddleware,
+    validateParams(schemas.idParam),
+    validateBody(schemas.adminGroupFlag),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { id } = req.params;
+        const { flagged, adminId } = req.body;
+        const { mockGroups } = await import('../mock_data');
+        const group = (mockGroups as Array<{ id: string; [key: string]: unknown }>).find(
+          (g) => g.id === id
+        );
+        if (!group) return next(new AppError('NOT_FOUND', 'Group not found', 404));
+        adminService.logAction(adminId, 'FLAG_GROUP', id, 'Group', { flagged });
+        res.json({ ...group, flagged });
+      } catch (error) {
+        logger.error('Failed to flag group', { error: String(error) });
+        next(new AppError('ADMIN_UPDATE_FAILED', 'Failed to flag group', 500));
+      }
     }
-  });
+  );
 
   router.get('/admin/audit-logs', adminAuthMiddleware, async (req, res, next) => {
     try {
@@ -709,7 +757,7 @@ export function createV1Router(services: V1Services): Router {
   router.post(
     '/api-keys',
     validateBody(schemas.apiKeyCreate),
-    async (req: any, res: any, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { userId, name, tier } = req.body;
         const { key, info } = await apiKeyService.generateKey(
@@ -729,7 +777,7 @@ export function createV1Router(services: V1Services): Router {
     '/api-keys/:keyId',
     apiKeyAuthMiddleware,
     validateParams(schemas.keyIdParam),
-    async (req: any, res: any, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         await apiKeyService.revokeKey(req.params.keyId);
         res.json({ message: 'API key revoked' });
@@ -744,7 +792,7 @@ export function createV1Router(services: V1Services): Router {
     '/api-keys/:keyId/usage',
     apiKeyAuthMiddleware,
     validateParams(schemas.keyIdParam),
-    async (req: any, res: any, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const stats = await apiKeyService.getUsageStats(
           req.params.keyId,
@@ -763,18 +811,33 @@ export function createV1Router(services: V1Services): Router {
   router.get(
     '/public/groups',
     apiKeyAuthMiddleware,
-    async (req: any, res: any, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
         const offset = parseInt(req.query.offset as string) || 0;
-        const groups = await (eventIndexer as any).prisma.contractEvent.findMany({
+        interface EventIndexerGroupsDb {
+          prisma: {
+            contractEvent: {
+              findMany: (args: unknown) => Promise<unknown[]>;
+            };
+          };
+        }
+        const indexerDb = eventIndexer as unknown as EventIndexerGroupsDb;
+        const groups = await indexerDb.prisma.contractEvent.findMany({
           where: { eventType: 'GroupCreated' },
           orderBy: { timestamp: 'desc' },
           take: limit,
           skip: offset,
         });
         await recordApiUsage(req, res);
-        res.json({ count: groups.length, limit, offset, groups: groups.map(toContractEventDTO) });
+        res.json({
+          count: groups.length,
+          limit,
+          offset,
+          groups: groups.map((g) =>
+            toContractEventDTO(g as Parameters<typeof toContractEventDTO>[0])
+          ),
+        });
       } catch (error) {
         logger.error('Failed to fetch public groups', { error: String(error) });
         next(new AppError('FETCH_FAILED', 'Failed to fetch groups', 500));
@@ -785,7 +848,7 @@ export function createV1Router(services: V1Services): Router {
   router.get(
     '/public/stats',
     apiKeyAuthMiddleware,
-    async (req: any, res: any, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const stats = await analyticsService.getGroupsOverviewStats();
         await recordApiUsage(req, res);

@@ -27,6 +27,18 @@ export interface TransactionPage {
   offset: number;
 }
 
+interface HorizonTransaction {
+  hash: string;
+  ledger?: number | string;
+  source_account?: string;
+  fee_charged?: string;
+  operation_count?: number;
+  envelope_xdr?: string | null;
+  result_xdr?: string | null;
+  paging_token?: string;
+  created_at?: string;
+}
+
 export class HorizonIndexer {
   private prisma: PrismaClient;
   private horizonUrl: string;
@@ -40,7 +52,7 @@ export class HorizonIndexer {
     this.contractId = contractId;
     this.pollIntervalMs = options.pollIntervalMs ?? 5000;
     this.pageSize = options.pageSize ?? 200;
-    this.prisma = new (PrismaClient as any)();
+    this.prisma = new (PrismaClient as unknown as new () => PrismaClient)();
   }
 
   async start(): Promise<void> {
@@ -126,8 +138,8 @@ export class HorizonIndexer {
         const res = await fetch(url.toString());
         if (!res.ok) throw new Error(`Horizon responded ${res.status} for ${url}`);
 
-        const body: any = await res.json();
-        const records: any[] = body._embedded?.records ?? [];
+        const body = (await res.json()) as { _embedded?: { records?: HorizonTransaction[] } };
+        const records: HorizonTransaction[] = body._embedded?.records ?? [];
 
         if (records.length === 0) {
           await this.delay(this.pollIntervalMs);
@@ -166,7 +178,7 @@ export class HorizonIndexer {
   }
 
   /** Upsert one transaction; the unique constraint on txHash provides deduplication. */
-  private async storeTx(tx: any): Promise<void> {
+  private async storeTx(tx: HorizonTransaction): Promise<void> {
     try {
       await this.prisma.indexedTransaction.upsert({
         where: { txHash: tx.hash },
@@ -184,7 +196,7 @@ export class HorizonIndexer {
           createdAt: tx.created_at ? new Date(tx.created_at) : new Date(),
         },
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Unique-constraint violations from concurrent indexers are harmless
       if (!String(err).includes('Unique constraint')) {
         logger.error('[HorizonIndexer] Failed to store tx', tx.hash, err);

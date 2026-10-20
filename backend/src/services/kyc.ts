@@ -28,10 +28,32 @@ export interface KycStatusResult {
   reviewedAt?: string;
 }
 
+interface KycDbRecord {
+  userId: string;
+  walletAddress: string;
+  status: string;
+  kycProviderId?: string | null;
+  submittedAt: Date;
+  reviewedAt?: Date | null;
+}
+
+interface KycDb {
+  kycRecord: {
+    upsert: (args: unknown) => Promise<KycDbRecord>;
+    findUnique: (args: unknown) => Promise<KycDbRecord | null>;
+    update: (args: unknown) => Promise<KycDbRecord>;
+  };
+  kycStatusEvent: {
+    create: (args: unknown) => Promise<unknown>;
+  };
+}
+
+const kycDb = prisma as unknown as KycDb;
+
 export async function submitKyc(opts: KycSubmitOpts): Promise<KycStatusResult> {
   const { userId, walletAddress, fields } = opts;
   const providerUrl =
-    (config as any).kyc?.providerUrl ??
+    (config as { kyc?: { providerUrl?: string } }).kyc?.providerUrl ??
     process.env['KYC_PROVIDER_URL'] ??
     'https://sandbox.kyc-provider.example.com';
 
@@ -50,7 +72,7 @@ export async function submitKyc(opts: KycSubmitOpts): Promise<KycStatusResult> {
     logger.warn('[kyc] provider returned non-ok status', { status: res.status, userId });
   }
 
-  const record = await (prisma as any).kycRecord.upsert({
+  const record = await kycDb.kycRecord.upsert({
     where: { userId },
     create: { userId, walletAddress, status: 'pending', kycProviderId: kycProviderId ?? null },
     update: { walletAddress, status: 'pending', kycProviderId: kycProviderId ?? null },
@@ -66,7 +88,7 @@ export async function submitKyc(opts: KycSubmitOpts): Promise<KycStatusResult> {
 }
 
 export async function getKycStatus(userId: string): Promise<KycStatusResult> {
-  const record = await (prisma as any).kycRecord.findUnique({ where: { userId } });
+  const record = await kycDb.kycRecord.findUnique({ where: { userId } });
   if (!record) return { userId, status: 'pending' };
   return {
     userId: record.userId,
@@ -78,11 +100,11 @@ export async function getKycStatus(userId: string): Promise<KycStatusResult> {
 }
 
 export async function pollAndUpdateStatus(userId: string): Promise<KycStatusResult> {
-  const record = await (prisma as any).kycRecord.findUnique({ where: { userId } });
+  const record = await kycDb.kycRecord.findUnique({ where: { userId } });
   if (!record || !record.kycProviderId) return getKycStatus(userId);
 
   const providerUrl =
-    (config as any).kyc?.providerUrl ??
+    (config as { kyc?: { providerUrl?: string } }).kyc?.providerUrl ??
     process.env['KYC_PROVIDER_URL'] ??
     'https://sandbox.kyc-provider.example.com';
   const res = await fetchWithCorrelationId(
@@ -98,7 +120,7 @@ export async function pollAndUpdateStatus(userId: string): Promise<KycStatusResu
 
   if (newStatus !== record.status) {
     await emitKycStatusChange(userId, record.status, newStatus);
-    await (prisma as any).kycRecord.update({
+    await kycDb.kycRecord.update({
       where: { userId },
       data: { status: newStatus, reviewedAt: new Date() },
     });
@@ -113,7 +135,7 @@ export async function emitKycStatusChange(
   oldStatus: string,
   newStatus: string
 ): Promise<void> {
-  await (prisma as any).kycStatusEvent.create({ data: { userId, oldStatus, newStatus } });
+  await kycDb.kycStatusEvent.create({ data: { userId, oldStatus, newStatus } });
   logger.info('[kyc] status change event emitted', { userId, oldStatus, newStatus });
 }
 
