@@ -149,6 +149,37 @@ pub const PENALTY_RECOVERY_FEE_BPS: u32 = 1_000;
 /// Unit: percentage (0-100)
 pub const AUTO_PAUSE_DISPUTE_THRESHOLD_PCT: u32 = 50;
 
+/// Numerator of the majority fraction used for contribution-change votes.
+///
+/// The majority threshold is computed as:
+///   `threshold = member_count * GOVERNANCE_MAJORITY_NUMERATOR
+///                             / GOVERNANCE_MAJORITY_DENOMINATOR + 1`
+///
+/// With numerator = 1 and denominator = 2 this gives the strict simple majority
+/// `floor(member_count / 2) + 1`, which requires more than half the members to approve.
+///
+/// Both numerator and denominator must be consulted together; use the helper
+/// [`crate::governance::majority_threshold`] rather than applying them manually.
+///
+/// Unit: dimensionless fraction component
+pub const GOVERNANCE_MAJORITY_NUMERATOR: u32 = 1;
+
+/// Denominator of the majority fraction used for contribution-change votes.
+///
+/// See [`GOVERNANCE_MAJORITY_NUMERATOR`] for the full formula.
+/// Unit: dimensionless fraction component
+pub const GOVERNANCE_MAJORITY_DENOMINATOR: u32 = 2;
+
+/// Dissolution requires every member to cast a vote (unanimity).
+///
+/// This constant documents the rule: `vote_count >= member_count`.
+/// It is used in [`crate::governance::voting::vote_dissolve`] and
+/// property tests to assert that no member is excluded from the decision.
+///
+/// Value `true` means unanimity is required; changing to `false` would require
+/// additional code changes in the dissolution voting path.
+pub const GOVERNANCE_DISSOLUTION_REQUIRES_UNANIMITY: bool = true;
+
 // ─── Contribution History ─────────────────────────────────────────────────────
 
 /// Maximum number of contribution history entries returned per page in the

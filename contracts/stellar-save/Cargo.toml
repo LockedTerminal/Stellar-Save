@@ -17,11 +17,7 @@ stellar-save-common = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-# ed25519-dalek is only needed by the ZK test modules (zk_tests.rs and
-# zk_integration_tests.rs). It is declared here rather than in [dependencies]
-# so it never makes it into the production WASM binary.
-# Only pulled in when the `zk` feature is active — see [features] below.
-ed25519-dalek = { version = "2.1.1", optional = true }
+proptest = { version = "1.4.0", default-features = false, features = ["std"] }
 
 [features]
 # Enable coverage instrumentation (used by cargo-tarpaulin / cargo-llvm-cov)
