@@ -49,8 +49,8 @@ Documentation files are generated in `target/doc/stellar_save/index.html`.
 
 ## 🔗 Related Documentation Links
 
-- [Architecture Overview](docs/architecture.md)
-- [Contract API Reference](docs/contract-api-reference.md)
-- [Storage Layout Guide](docs/storage-layout.md)
-- [Security Invariants](docs/security-invariants.md)
-- [Contributing Guidelines](CONTRIBUTING.md)
+- [Architecture Overview](../architecture.md)
+- [Contract API Reference](../contract-api-reference.md)
+- [Storage Layout Guide](../storage-layout.md)
+- [Security Invariants](../security-invariants.md)
+- [Contributing Guidelines](../../CONTRIBUTING.md)
