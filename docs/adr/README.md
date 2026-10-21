@@ -16,6 +16,7 @@ An Architecture Decision Record captures a single architecture decision, includi
 | [ADR-004](./ADR-004-contract-module-boundaries.md) | Smart Contract Module Boundaries | Accepted | 2025-01-15 |
 | [ADR-005](./ADR-005-frontend-state-management.md) | Frontend State Management Approach | Accepted | 2025-02-01 |
 | [ADR-006](./ADR-006-on-chain-vs-off-chain-source-of-truth.md) | On-Chain vs Off-Chain Source of Truth | Proposed | 2026-10-19 |
+| [ADR-007](./ADR-007-mobile-app-ownership.md) | Mobile App Ownership — Capacitor vs. Expo React Native | Accepted | 2026-10-19 |
 
 ## ADR Status Lifecycle
 
@@ -27,7 +28,7 @@ An Architecture Decision Record captures a single architecture decision, includi
 ## Creating a New ADR
 
 1. Copy the template from `ADR-001` as a starting point
-2. Number sequentially (next: ADR-007)
+2. Number sequentially (next: ADR-008)
 3. Fill in all sections: Context, Decision, Rationale, Consequences
 4. Submit as a PR for team review
 5. Update this index
@@ -37,6 +38,24 @@ An Architecture Decision Record captures a single architecture decision, includi
 - [Contributing Guide](../../CONTRIBUTING.md)
 - [API Reference](../api/README.md)
 - [Backend Architecture](../../backend/README.md)
+
+## Adding New ADRs
+
+When making significant architectural decisions:
+
+1. Create a new file: `ADR-NNN-short-title.md`
+2. Use the standard format (see above)
+3. Link it in this index
+4. Update the status as the decision evolves
+5. Reference related ADRs
+
+## Superseding ADRs
+
+If a decision is reversed or updated:
+
+1. Update the original ADR status to "Superseded by ADR-NNN"
+2. Create a new ADR explaining the change
+3. Link both ADRs together
 
 ## References
 

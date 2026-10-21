@@ -1,3 +1,7 @@
+# tarpaulin.toml — cargo-tarpaulin configuration for Rust contract coverage.
+# Read by `cargo tarpaulin --config tarpaulin.toml` and the coverage.yml CI workflow.
+# Enforces a minimum 90 % line-coverage gate for the contracts workspace.
+
 [default]
 # Run on native target; wasm32 is not supported by tarpaulin
 target-dir = "target"
