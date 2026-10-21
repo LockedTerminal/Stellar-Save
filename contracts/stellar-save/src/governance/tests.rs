@@ -1,14 +1,29 @@
-/// Property-based tests for governance invariants.
-///
-/// Feature: Governance
-///
-/// Core invariants tested:
-///   1. Quorum always enforced — no proposal can pass without meeting the
-///      configured quorum threshold.
-///   2. Timelock always enforced — no proposal can execute before its timelock
-///      expires, regardless of vote count.
+//! Property-based tests for governance invariants.
+//!
+//! Feature: Governance
+//!
+//! Core invariants tested:
+//!   1. Quorum always enforced — no proposal can pass without meeting the
+//!      configured quorum threshold.
+//!   2. Timelock always enforced — no proposal can execute before its timelock
+//!      expires, regardless of vote count.
+//!   3. Majority threshold matches the formula backed by
+//!      [`crate::constants::GOVERNANCE_MAJORITY_NUMERATOR`] /
+//!      [`crate::constants::GOVERNANCE_MAJORITY_DENOMINATOR`].
+//!   4. Dissolution requires unanimity per
+//!      [`crate::constants::GOVERNANCE_DISSOLUTION_REQUIRES_UNANIMITY`].
+//!
+//! The helper functions (`meets_quorum`, `timelock_expired`, `can_execute`,
+//! `governance_majority`, `can_execute_contribution_change`,
+//! `can_execute_dissolution`) mirror the logic in [`super::voting`] so that the
+//! invariants are verified in pure Rust without a Soroban environment.  The
+//! critical difference from the old `governance_property_tests.rs` is that the
+//! majority formula is now derived from the single-source constants rather than
+//! being re-stated as a magic number.
+
 #[cfg(test)]
 mod governance_property_tests {
+    use crate::governance::majority_threshold;
     use proptest::prelude::*;
 
     // ── Strategies ────────────────────────────────────────────────────────────
@@ -38,18 +53,14 @@ mod governance_property_tests {
         1_000_000_u64..=u64::MAX / 2
     }
 
-    /// A timestamp representing the current time (after proposal creation).
-    fn current_time(created_at: u64) -> impl Strategy<Value = u64> {
-        created_at..=u64::MAX / 2
-    }
-
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /// Check if a proposal meets quorum.
-    /// Returns true if votes_for / total_voting_power >= quorum_percent / 100.
+    ///
+    /// Returns `true` if `votes_for / total_voting_power >= quorum_percent / 100`.
     fn meets_quorum(votes_for: u64, total_voting_power: u64, quorum_percent: u8) -> bool {
         if total_voting_power == 0 {
-            return false; // no voting power means no quorum
+            return false;
         }
         // Use 128-bit arithmetic to avoid overflow.
         let votes = votes_for as u128;
@@ -64,7 +75,8 @@ mod governance_property_tests {
         current >= created_at.saturating_add(lock_duration)
     }
 
-    /// Determine if a proposal can execute: must meet quorum AND timelock must have expired.
+    /// Determine if a proposal can execute: must meet quorum AND timelock must
+    /// have expired.
     fn can_execute(
         votes_for: u64,
         total_voting_power: u64,
@@ -75,6 +87,32 @@ mod governance_property_tests {
     ) -> bool {
         meets_quorum(votes_for, total_voting_power, quorum_percent)
             && timelock_expired(created_at, current, lock_duration)
+    }
+
+    /// Evaluates dynamic contribution vote outcome using the single-source
+    /// [`crate::governance::majority_threshold`] helper backed by constants.
+    fn can_execute_contribution_change(vote_count: u32, member_count: u32) -> bool {
+        if member_count == 0 {
+            return false;
+        }
+        vote_count >= majority_threshold(member_count)
+    }
+
+    /// Evaluates dissolution vote outcome.
+    ///
+    /// Dissolution requires unanimity: `vote_count >= member_count`.
+    /// See [`crate::constants::GOVERNANCE_DISSOLUTION_REQUIRES_UNANIMITY`].
+    fn can_execute_dissolution(vote_count: u32, member_count: u32) -> bool {
+        use crate::constants::GOVERNANCE_DISSOLUTION_REQUIRES_UNANIMITY;
+        if member_count == 0 {
+            return false;
+        }
+        if GOVERNANCE_DISSOLUTION_REQUIRES_UNANIMITY {
+            vote_count >= member_count
+        } else {
+            // Future: plug in alternative threshold here.
+            vote_count >= majority_threshold(member_count)
+        }
     }
 
     // ── Feature: Governance  Property 1 ──────────────────────────────────────
@@ -314,38 +352,18 @@ mod governance_property_tests {
 
     extern crate std;
 
-    /// Calculates majority threshold as defined in governance::voting:
-    /// `majority = member_count / 2 + 1`
-    fn governance_majority(member_count: u32) -> u32 {
-        member_count / 2 + 1
-    }
-
-    /// Evaluates dynamic contribution vote outcome.
-    fn can_execute_contribution_change(vote_count: u32, member_count: u32) -> bool {
-        if member_count == 0 {
-            return false;
-        }
-        vote_count >= governance_majority(member_count)
-    }
-
-    /// Evaluates dissolution vote outcome (unanimity required).
-    fn can_execute_dissolution(vote_count: u32, member_count: u32) -> bool {
-        if member_count == 0 {
-            return false;
-        }
-        vote_count >= member_count
-    }
-
     proptest! {
         /// Feature: Governance Property 13 - Majority is always strict (> 50%)
         ///
-        /// For any positive member count, the majority threshold is strictly greater
-        /// than member_count / 2 and at most member_count.
+        /// For any positive member count, the majority threshold derived from
+        /// [`crate::governance::majority_threshold`] (which uses the single-source
+        /// constants) is strictly greater than member_count / 2 and at most
+        /// member_count.
         #[test]
         fn prop_governance_majority_threshold_is_strict_majority(
             members in 1_u32..=10_000_u32,
         ) {
-            let threshold = governance_majority(members);
+            let threshold = majority_threshold(members);
             prop_assert!(
                 (threshold as u64) * 2 > (members as u64),
                 "majority ({}) * 2 must be > members ({})",
@@ -369,7 +387,7 @@ mod governance_property_tests {
             members in 1_u32..=1_000_u32,
             votes in 0_u32..=1_000_u32,
         ) {
-            let threshold = governance_majority(members);
+            let threshold = majority_threshold(members);
             let executable = can_execute_contribution_change(votes, members);
 
             if votes < threshold {
@@ -469,10 +487,10 @@ mod governance_property_tests {
 
             // Proposing a new amount resets the vote count to 0
             let reset_vote_count = 0_u32;
-            let can_execute = can_execute_contribution_change(reset_vote_count, members);
+            let can_exec = can_execute_contribution_change(reset_vote_count, members);
 
             prop_assert!(
-                !can_execute,
+                !can_exec,
                 "new proposal after reset must start at 0 votes and not be executable"
             );
             prop_assert_eq!(reset_vote_count, 0);
