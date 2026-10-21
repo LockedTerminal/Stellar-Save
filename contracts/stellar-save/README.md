@@ -96,3 +96,41 @@ cargo test -p stellar-save
 Tests cover pool creation, joining, contributions, and payout logic. Since the
 contract is not upgradeable, there is no upgrade-simulation test; the constraint
 above is the enforced contract behavior.
+
+## Cargo Feature Flags
+
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `zk` | **off** | Ed25519-based contribution-proof verification (Phase 1 ZK scheme) |
+| `clone-group` | off | Group-clone helpers (not yet wired to a contract entry-point) |
+| `group-templates` | off | Group-template helpers (not yet wired to a contract entry-point) |
+| `coverage` | off | Coverage instrumentation for `cargo-tarpaulin` / `cargo-llvm-cov` |
+
+### `zk` feature
+
+The `zk` feature gates the entire ZK subsystem:
+
+- `src/zk_proof.rs` — Ed25519-based `verify_contribution_proof` implementation
+- `src/zk_tests.rs` — unit tests covering valid/invalid/malformed proof paths
+- `src/zk_integration_tests.rs` — integration tests through the contract client
+- The `verify_contribution_proof` entrypoint in `contract.rs` calls the real
+  verifier only when `zk` is enabled; without it the entrypoint returns
+  `InvalidState` immediately.
+
+**Why off by default?**  The ZK subsystem corresponds to the `zk/` workspace at
+the repository root, which is classified as *Experimental* (see `README.md`).
+There are open HIGH-priority audit items in [`zk/CIRCUIT_AUDIT.md`](../../zk/CIRCUIT_AUDIT.md)
+tracked by issue #1327. Shipping experimental cryptography in the default build
+would increase the audit scope and the production WASM size unnecessarily.
+
+**To run the ZK test suite:**
+
+```sh
+cargo test -p stellar-save --features zk
+```
+
+**To build a WASM with ZK enabled** (not for production until audit closes):
+
+```sh
+cargo build -p stellar-save --release --features zk --target wasm32-unknown-unknown
+```
