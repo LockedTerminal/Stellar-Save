@@ -17,6 +17,11 @@ stellar-save-common = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+# ed25519-dalek is only needed by the ZK test modules (zk_tests.rs and
+# zk_integration_tests.rs). It is declared here rather than in [dependencies]
+# so it never makes it into the production WASM binary.
+# Only pulled in when the `zk` feature is active — see [features] below.
+ed25519-dalek = { version = "2.1.1", optional = true }
 
 [features]
 # Enable coverage instrumentation (used by cargo-tarpaulin / cargo-llvm-cov)
@@ -37,5 +42,17 @@ coverage = []
 #                      the clone-group UX is ready (see docs/admin-actions.md §clone).
 #                      GitHub tracking: add "CloneGroup" entry-point to contract.rs
 #                      before enabling this feature in the release profile.
+#
+#   zk               — Ed25519-based contribution-proof verification (Phase 1 of the
+#                      ZK subsystem documented in zk/CIRCUIT_AUDIT.md and
+#                      docs/zk-verification.md). Excluded from production builds until
+#                      the circuit audit closes (issue #1327). When enabled:
+#                        • zk_proof.rs and its verify_contribution_proof call site in
+#                          contract.rs are compiled in.
+#                        • zk_tests.rs and zk_integration_tests.rs are compiled and run.
+#                        • ed25519-dalek dev-dependency becomes available.
+#                      To run the ZK test suite:
+#                        cargo test -p stellar-save --features zk
 group-templates = []
 clone-group = []
+zk = ["dep:ed25519-dalek"]

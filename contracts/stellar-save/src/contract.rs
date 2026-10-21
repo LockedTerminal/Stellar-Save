@@ -5006,8 +5006,17 @@ impl StellarSaveContract {
             return Err(StellarSaveError::NotMember);
         }
 
+        // zk_proof module is only compiled when the `zk` feature is active.
+        // Without it, the entrypoint returns InvalidState so callers know the
+        // feature is not available in this build.
+        #[cfg(feature = "zk")]
         if !crate::zk_proof::verify_contribution_proof(&env, &proof, group_id, cycle) {
             return Err(StellarSaveError::InvalidProof);
+        }
+        #[cfg(not(feature = "zk"))]
+        {
+            let _ = proof; // suppress unused-variable warning
+            return Err(StellarSaveError::InvalidState);
         }
 
         let proof_key =
