@@ -66,6 +66,37 @@ For full architecture details see [docs/architecture.md](docs/architecture.md).
 
 ---
 
+## Package Manager
+
+> **This repository uses [pnpm@9](https://pnpm.io/) as its sole package manager.**
+> See [docs/adr/ADR-006-package-manager.md](docs/adr/ADR-006-package-manager.md) for the full rationale.
+
+### Rule: always use `pnpm`, never `npm` or `yarn`
+
+Running `npm install` or `yarn` in any workspace generates a stale `package-lock.json`
+that conflicts with the canonical `pnpm-lock.yaml`. **PRs that add or modify
+`package-lock.json` will be rejected.**
+
+| Task                         | Command                                      |
+| ---------------------------- | -------------------------------------------- |
+| Install all workspace deps   | `pnpm install`                               |
+| Add a runtime dependency     | `pnpm add <package>`                         |
+| Add a dev dependency         | `pnpm add -D <package>`                      |
+| Remove a dependency          | `pnpm remove <package>`                      |
+| Run a package.json script    | `pnpm run <script>` or `pnpm <script>`       |
+| CI install (strict lockfile) | `pnpm install --frozen-lockfile`             |
+
+Corepack (bundled with Node.js 16.9+) will enforce the exact pnpm version declared
+in `package.json → "packageManager"`. Enable it once:
+
+```bash
+corepack enable
+```
+
+After that, `pnpm` will automatically use the pinned version without a separate install step.
+
+---
+
 ## Development Setup
 
 ### Prerequisites
@@ -75,7 +106,7 @@ For full architecture details see [docs/architecture.md](docs/architecture.md).
 | Rust                  | 1.81.0 (pinned) | [rustup.rs](https://rustup.rs)                                            |
 | Soroban / Stellar CLI | latest          | [Stellar CLI docs](https://developers.stellar.org/docs/tools/stellar-cli) |
 | Node.js               | 18+             | [nodejs.org](https://nodejs.org)                                          |
-| npm                   | 9+              | bundled with Node.js                                                      |
+| pnpm                  | 9.x (pinned)    | `corepack enable` (after Node.js install)                                 |
 
 The Rust toolchain version is pinned in `rust-toolchain.toml`. Running any `cargo` command will install it automatically via rustup.
 
@@ -85,12 +116,16 @@ The Rust toolchain version is pinned in `rust-toolchain.toml`. Running any `carg
 git clone https://github.com/Xoulomon/Stellar-Save.git
 cd Stellar-Save
 
-# Install root-level tooling (commitlint, husky)
-npm install
+# Enable Corepack so pnpm@9 is used automatically
+corepack enable
 
-# Install frontend dependencies
-cd frontend && npm install && cd ..
+# Install all workspace dependencies (frontend, backend, mobile, packages/*)
+pnpm install
 ```
+
+The repository uses **pnpm only**. `pnpm-lock.yaml` at the root is the single
+source of truth for resolved versions — do not run `npm install` or `yarn` at
+the root and do not commit a root `package-lock.json` or `yarn.lock`.
 
 ### Environment configuration
 
@@ -117,7 +152,7 @@ cargo build --target wasm32-unknown-unknown --release
 
 ```bash
 cd frontend
-npm run dev
+pnpm dev
 ```
 
 ### Deploy to testnet
@@ -196,6 +231,37 @@ pub fn require_creator(env: &Env, group: &Group) -> Result<(), ContractError> {
 - **`no-unused-vars` and `@typescript-eslint/no-explicit-any` are both set to `error`** repo-wide in `eslint.config.base.js`. Violations block the pre-commit hook and CI. If a genuine exception is needed (e.g. a pending Prisma migration model, a browser-context injection in Playwright), add an inline `// eslint-disable-next-line @typescript-eslint/no-explicit-any -- <one-line justification>` comment.
 - **Import Ordering**: enforced by `eslint-plugin-import` (`import/order`, error). Groups are separated by a blank line, imports sorted alphabetically (case-insensitive) within each group: `builtin` → `external` → `internal` → `parent`/`sibling` (`../`, `./`) → `index` → `type`. See the `import/order` rule in `eslint.config.base.js`.
 - **Circular Dependencies**: Circular dependencies are strictly forbidden (`import/no-cycle`). Ensure modules are strictly decoupled and acyclic
+- **No `console.log`**: `no-console` is `error` repo-wide (only `console.warn` / `console.error` are allowed). Use the workspace logger — `frontend/src/utils/logger.ts` or `backend/src/lib/logger.ts` — or `process.stdout.write` in Node CLI scripts. Test files are exempt. Only logger modules may disable the rule inline.
+
+### ESLint configuration
+
+Every workspace extends one shared config, [`eslint.config.base.js`](eslint.config.base.js). Package configs spread it first and add only workspace-specific overrides — never re-declare a shared rule in a workspace config.
+
+| Config                                     | Scope                   | Workspace-specific additions                             |
+| ------------------------------------------ | ----------------------- | -------------------------------------------------------- |
+| `eslint.config.mjs`                        | repo-root tooling files | CommonJS for `.lintstagedrc.js` / `commitlint.config.js` |
+| `frontend/eslint.config.js`                | web app                 | browser globals, React Hooks, React Refresh, jsx-a11y    |
+| `backend/eslint.config.mjs`                | API server              | Node globals, CommonJS, ignores `src/generated/**`       |
+| `mobile/eslint.config.js`                  | React Native app        | ignores `.expo/`, `android/`, `ios/`                     |
+| `packages/sdk/eslint.config.mjs`           | published SDK           | none                                                     |
+| `packages/shared-utils/eslint.config.mjs`  | shared utilities        | none                                                     |
+| `packages/events-schema/eslint.config.mjs` | codegen scripts         | CommonJS + Node globals for `*.js`, ignores `generated/` |
+
+Shared rules (all from `eslint.config.base.js`):
+
+| Rule                                         | Setting                                                                                            |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `js.configs.recommended`                     | preset                                                                                             |
+| `tseslint.configs.recommended`               | preset                                                                                             |
+| `@typescript-eslint/no-explicit-any`         | `error`, `fixToUnknown: true`                                                                      |
+| `@typescript-eslint/no-unused-vars`          | `error`; names starting with `_` are ignored (args, vars, caught errors, destructured array items) |
+| `@typescript-eslint/consistent-type-imports` | `error`, `prefer: 'type-imports'`                                                                  |
+| `no-console`                                 | `error`, allows `warn` and `error`; `off` in test files                                            |
+| `import/no-cycle`                            | `error`                                                                                            |
+| `import/order`                               | `error`, grouped and alphabetized (see above)                                                      |
+| ignores                                      | `dist/**`, `node_modules/**`, `coverage/**`, `*.d.ts`                                              |
+
+Test files for the `no-console` exemption: `**/*.test.*`, `**/*.spec.*`, `**/*.e2e.{ts,tsx}`, and anything under `test/`, `tests/`, `tests-e2e/` or `e2e/`.
 
 Prettier config (`.prettierrc`):
 
@@ -363,11 +429,11 @@ The hook is installed by Husky and lives at `.husky/commit-msg`. It runs `commit
 
 ```bash
 # Install root dependencies (includes husky + commitlint)
-npm install
+pnpm install
 # Husky installs the git hook automatically via the "prepare" script
 ```
 
-If the hook is not firing, re-run `npx husky` from the repo root.
+If the hook is not firing, re-run `pnpm exec husky` from the repo root.
 
 **Verify the hook locally:**
 
@@ -651,6 +717,31 @@ npm test -- --coverage
 - ✅ Test both success and failure paths
 - ✅ Use descriptive test names: `test_contribute_with_insufficient_balance` not `test_1`
 
+### Snapshot Tests
+
+The repository keeps two kinds of committed snapshots:
+
+| Suite                     | Location                                     | Written by                         |
+| ------------------------- | -------------------------------------------- | ---------------------------------- |
+| Frontend (Vitest)         | `frontend/src/test/__snapshots__/*.snap`     | `toMatchSnapshot()`                |
+| Smart contracts (Soroban) | `contracts/<crate>/test_snapshots/**/*.json` | every test that creates an `Env`   |
+
+Snapshots are only useful if a human reads every change to them. Rules:
+
+- **Never run `-u` / `--update` blindly.** Update snapshots only for the tests
+  your change intentionally affects, e.g.
+  `cd frontend && pnpm vitest run src/test/GroupDetailPage.snapshot.test.tsx -u`.
+- **Explain every snapshot change in the PR description** — which snapshot
+  changed and why the new output is correct. Reviewers must reject PRs whose
+  snapshot diffs are unexplained.
+- **Delete obsolete snapshots in the same PR** that removes or renames a test.
+  - Frontend: Vitest prints `obsolete` entries in its summary; remove them with
+    `pnpm vitest run -u` scoped to the affected file, then review the diff.
+  - Contracts: Soroban does not prune `test_snapshots/` — delete the JSON
+    files whose module path / test name no longer exists.
+- **Keep snapshots small** — snapshot the component under test, not the whole
+  page tree, so diffs stay reviewable.
+
 ### CI/CD Pipeline
 
 All tests run automatically on:
@@ -773,6 +864,7 @@ Step-by-step instructions to verify the changes
 - [ ] Code follows style guidelines
 - [ ] Documentation updated
 - [ ] No breaking changes (or documented)
+- [ ] Every snapshot change is explained in the description, and obsolete snapshots are deleted (see [Snapshot Tests](#snapshot-tests))
 ```
 
 ### PR Process Steps

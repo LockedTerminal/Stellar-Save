@@ -2,31 +2,17 @@ import {
   NotificationPreferenceRepository
 } from '../modules/notifications/notification-preference.repository';
 import { NotificationFactory } from '../../test/fixtures/factory';
+import { createPrismaMock } from '../../tests/helpers/prismaMock';
 
 import type {
   NotificationPreferencePrisma} from '../modules/notifications/notification-preference.repository';
 
-function mockDb() {
-  return {
-    notificationPreference: {
-      findUnique: jest.fn(),
-      findFirst: jest.fn(),
-      findMany: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      updateMany: jest.fn(),
-      count: jest.fn(),
-      groupBy: jest.fn(),
-    },
-  };
-}
-
 describe('NotificationPreferenceRepository', () => {
-  let db: ReturnType<typeof mockDb>;
+  let db: ReturnType<typeof createPrismaMock>;
   let repo: NotificationPreferenceRepository;
 
   beforeEach(() => {
-    db = mockDb();
+    db = createPrismaMock();
     repo = new NotificationPreferenceRepository(db as unknown as NotificationPreferencePrisma);
   });
 

@@ -6,6 +6,9 @@ import tseslint from 'typescript-eslint';
 
 import base from '../eslint.config.base.js';
 
+// Shared rules (no-console, no-unused-vars, no-explicit-any, import order,
+// test-file overrides) come from the base config. Only browser/React-specific
+// settings live here.
 export default tseslint.config(
   ...base,
   {
@@ -16,9 +19,30 @@ export default tseslint.config(
       globals: globals.browser,
     },
     rules: {
-      // Use utils/logger for debug/info output; raw console.log is banned.
-      'no-console': ['error', { allow: ['warn', 'error'] }],
-      '@typescript-eslint/no-explicit-any': ['error', { fixToUnknown: true }],
+      // Prevent mock/fixture data from being imported in production modules.
+      // Only test files (*.test.ts/tsx) and files inside src/mocks/ itself
+      // are allowed to import from src/mocks/.
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/mocks/**', '../mocks/**', './mocks/**'],
+              message:
+                'Mock data must not be imported from production modules. ' +
+                'Use the VITE_USE_MOCKS flag and a dynamic import inside the ' +
+                'API utility instead.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // Relax the restriction inside test files and the mocks directory itself
+  {
+    files: ['**/*.test.{ts,tsx}', '**/mocks/**'],
+    rules: {
+      'no-restricted-imports': 'off',
     },
   },
   // Static accessibility checks.
@@ -46,12 +70,6 @@ export default tseslint.config(
           Array.isArray(severity) ? ['warn', ...severity.slice(1)] : 'warn',
         ])
       ),
-    },
-  },
-  {
-    files: ['src/test/**', '**/*.test.{ts,tsx}', 'e2e/**'],
-    rules: {
-      'no-console': 'off',
     },
   }
 );

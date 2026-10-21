@@ -3,8 +3,9 @@
  *
  * Covers only the repo-level tooling files (this config, the shared base,
  * commitlint and lint-staged configs). Each workspace (frontend, backend,
- * mobile) owns its own `eslint.config.*`, which the pre-commit hook resolves
- * per file via ESLint's `v10_config_lookup_from_file` flag.
+ * mobile, packages/*) owns its own `eslint.config.*` that spreads the shared
+ * base; the pre-commit hook resolves it per file via ESLint's
+ * `v10_config_lookup_from_file` flag.
  */
 import base from './eslint.config.base.js';
 

@@ -1,5 +1,6 @@
 // lint-staged runs from the repo root, so resolve each file's config from its
-// own directory (frontend/, backend/, mobile/ or the root eslint.config.mjs)
+// own directory (frontend/, backend/, mobile/, packages/* or the root
+// eslint.config.mjs)
 // instead of only looking in the cwd. Files outside every config's scope are
 // skipped silently rather than failing --max-warnings 0.
 const eslint = 'eslint --flag v10_config_lookup_from_file --no-warn-ignored --max-warnings 0';

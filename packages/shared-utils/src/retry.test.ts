@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 
-import { withRetry, computeBackoffDelay, isTransientHttpError } from './retry';
+import { withRetry, computeBackoffDelay } from './retry';
 
 /** Records the delays a retry loop asked for instead of actually waiting. */
 function recordingSleep() {
@@ -223,26 +223,5 @@ describe('computeBackoffDelay', () => {
       Array.from({ length: 20 }, () => computeBackoffDelay(1, { ...base, jitter: 0.5 }))
     );
     expect(spread.size).toBeGreaterThan(1);
-  });
-});
-
-describe('isTransientHttpError', () => {
-  const predicate = isTransientHttpError((e) => (e as { status?: number })?.status);
-
-  it('retries 408, 429 and 5xx', () => {
-    for (const status of [408, 429, 500, 502, 503, 504]) {
-      expect(predicate({ status })).toBe(true);
-    }
-  });
-
-  it('does not retry 4xx that carry a verdict', () => {
-    for (const status of [400, 401, 403, 404, 409, 422]) {
-      expect(predicate({ status })).toBe(false);
-    }
-  });
-
-  it('treats a failure with no status as transient', () => {
-    expect(predicate(new Error('socket hang up'))).toBe(true);
-    expect(predicate(undefined)).toBe(true);
   });
 });

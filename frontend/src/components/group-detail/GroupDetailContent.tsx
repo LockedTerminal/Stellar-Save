@@ -7,7 +7,6 @@ import { Button } from '../Button';
 import { ContributionFlow } from '../ContributionFlow';
 import { InsurancePanel } from '../InsurancePanel';
 import { GroupReportExportButton } from '../GroupReportExportButton';
-import { ErrorBoundary } from '../ErrorBoundary/ErrorBoundary';
 import { useNavigation } from '../../routing/useNavigation';
 import { useWallet } from '../../hooks/useWallet';
 import { useGroup } from '../../hooks/useGroup';
@@ -15,7 +14,6 @@ import { queryKeys } from '../../lib/queryKeys';
 import { buildMemberCycleStatuses, buildPayoutRotation } from './groupDetailSelectors';
 import { MemberContributionTable } from './MemberContributionTable';
 import { PayoutRotationTimeline } from './PayoutRotationTimeline';
-import { ContributionStatusIcon } from './ContributionStatusIcon';
 
 import type { DetailedGroup, GroupMember } from '../../utils/groupApi';
 

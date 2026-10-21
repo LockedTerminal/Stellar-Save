@@ -1,9 +1,8 @@
 import { lazy, Suspense } from 'react';
 
 import './App.css';
-import { FeedbackWidget } from './components/FeedbackWidget';
-import { CardSkeleton } from './components/Skeleton';
 import { AppProviders } from './context/AppProviders';
+import { GroupRepositoryProvider } from './context/GroupRepositoryProvider';
 import { useDeepLink } from './hooks/useDeepLink';
 import { RouteLoadingFallback } from './routing/RouteLoadingFallback';
 
@@ -15,9 +14,11 @@ export default function App() {
 
   return (
     <AppProviders>
-      <Suspense fallback={<RouteLoadingFallback />}>
-        <AppRouter />
-      </Suspense>
+      <GroupRepositoryProvider>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <AppRouter />
+        </Suspense>
+      </GroupRepositoryProvider>
     </AppProviders>
   );
 }

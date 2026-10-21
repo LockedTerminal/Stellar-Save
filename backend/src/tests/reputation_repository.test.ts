@@ -2,27 +2,17 @@ import {
   MemberReputationRepository
 } from '../modules/reputation/reputation.repository';
 import { ReputationFactory } from '../../test/fixtures/factory';
+import { createPrismaMock } from '../../tests/helpers/prismaMock';
 
 import type {
   MemberReputationPrisma} from '../modules/reputation/reputation.repository';
 
-function mockDb() {
-  return {
-    memberReputation: {
-      findUnique: jest.fn(),
-      upsert: jest.fn(),
-      deleteMany: jest.fn(),
-      findMany: jest.fn(),
-    },
-  };
-}
-
 describe('MemberReputationRepository', () => {
-  let db: ReturnType<typeof mockDb>;
+  let db: ReturnType<typeof createPrismaMock>;
   let repo: MemberReputationRepository;
 
   beforeEach(() => {
-    db = mockDb();
+    db = createPrismaMock();
     repo = new MemberReputationRepository(db as unknown as MemberReputationPrisma);
   });
 

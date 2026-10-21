@@ -1,5 +1,6 @@
 /**
- * Shared ESLint flat-config base for every workspace (frontend, backend, mobile).
+ * Shared ESLint flat-config base for every workspace (frontend, backend, mobile,
+ * packages/sdk, packages/shared-utils, packages/events-schema).
  *
  * This is the single source of truth for the recommended presets, shared
  * rules, and common ignores. Workspace configs spread it first and add only
@@ -7,6 +8,9 @@
  *
  *   import base from '../eslint.config.base.js';
  *   export default [...base, { ... workspace-specific overrides ... }];
+ *
+ * The full rule list is documented in CONTRIBUTING.md ("ESLint configuration").
+ * Keep the two in sync when changing a rule here.
  *
  * Do not re-apply `js.configs.recommended` / `tseslint.configs.recommended`
  * in a workspace: doing so resets the tuned rule options below to their
@@ -25,10 +29,23 @@ const base = tseslint.config(
       import: importPlugin,
     },
     rules: {
-      '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      // `fixToUnknown` makes `eslint --fix` rewrite `any` to `unknown`.
+      '@typescript-eslint/no-explicit-any': ['error', { fixToUnknown: true }],
+      // Prefix deliberately unused bindings with `_` to opt out.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_',
+        },
+      ],
       '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports' }],
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      // Use the workspace logger (frontend/src/utils/logger.ts,
+      // backend/src/lib/logger.ts) or process.stdout/stderr in CLI scripts.
+      // Only logger modules may disable this rule inline.
+      'no-console': ['error', { allow: ['warn', 'error'] }],
       'import/no-cycle': ['error'],
       // Import grouping convention (external → internal → parent/sibling → index → type):
       //  1. builtin      Node built-ins (fs, path, ...)
@@ -55,6 +72,21 @@ const base = tseslint.config(
           alphabetize: { order: 'asc', caseInsensitive: true },
         },
       ],
+    },
+  },
+  {
+    // Test files and test runners report progress on stdout by design.
+    files: [
+      '**/*.test.{ts,tsx,js,mjs,cjs}',
+      '**/*.spec.{ts,tsx,js,mjs,cjs}',
+      '**/*.e2e.{ts,tsx}',
+      '**/test/**',
+      '**/tests/**',
+      '**/tests-e2e/**',
+      '**/e2e/**',
+    ],
+    rules: {
+      'no-console': 'off',
     },
   },
   {

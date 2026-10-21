@@ -42,45 +42,32 @@ import express from 'express';
 import request from 'supertest';
 
 import { createV1Router } from '../routes/v1';
+import { createPrismaMock } from '../../tests/helpers/prismaMock';
 
 // ---------------------------------------------------------------------------
 // Module-level mocks — must be declared before describe() blocks
 // ---------------------------------------------------------------------------
 
-// Prisma: the @prisma/client package requires a generated schema; stub it out.
 jest.mock('@prisma/client', () => {
-  const mockClient = {
-    contractEvent: {
-      count: jest.fn().mockResolvedValue(0),
-      groupBy: jest.fn().mockResolvedValue([]),
-      findMany: jest.fn().mockResolvedValue([]),
-    },
-    refreshToken: {
-      create: jest.fn().mockResolvedValue({}),
-      findUnique: jest.fn().mockResolvedValue(null),
-      update: jest.fn().mockResolvedValue({}),
-      deleteMany: jest.fn().mockResolvedValue({}),
-    },
-    $disconnect: jest.fn().mockResolvedValue(undefined),
+  const { createPrismaMock } = require('../../tests/helpers/prismaMock');
+  const mockClient = createPrismaMock();
+  mockClient.contractEvent.count.mockResolvedValue(0);
+  mockClient.contractEvent.groupBy.mockResolvedValue([]);
+  mockClient.contractEvent.findMany.mockResolvedValue([]);
+  mockClient.refreshToken.create.mockResolvedValue({});
+  mockClient.refreshToken.findUnique.mockResolvedValue(null);
+  mockClient.refreshToken.update.mockResolvedValue({});
+  mockClient.refreshToken.deleteMany.mockResolvedValue({ count: 0 });
+  mockClient.$disconnect.mockResolvedValue(undefined);
+  return {
+    PrismaClient: jest.fn().mockImplementation(() => mockClient),
+    __mockClient: mockClient,
   };
-  return { PrismaClient: jest.fn().mockImplementation(() => mockClient) };
 });
 
 // Also mock the prisma_client singleton so it never tries to connect.
 jest.mock('../prisma_client', () => ({
-  prisma: {
-    contractEvent: {
-      count: jest.fn().mockResolvedValue(0),
-      groupBy: jest.fn().mockResolvedValue([]),
-      findMany: jest.fn().mockResolvedValue([]),
-    },
-    refreshToken: {
-      create: jest.fn().mockResolvedValue({}),
-      findUnique: jest.fn().mockResolvedValue(null),
-      update: jest.fn().mockResolvedValue({}),
-      deleteMany: jest.fn().mockResolvedValue({}),
-    },
-  },
+  prisma: require('@prisma/client').__mockClient,
   disconnectPrisma: jest.fn().mockResolvedValue(undefined),
 }));
 
@@ -107,8 +94,13 @@ jest.mock('../analytics_middleware', () => ({
 // admin endpoints only use the inline AdminService, so other services just need
 // to be present as valid objects.
 // ---------------------------------------------------------------------------
-const makeStubServices = () =>
-  ({
+const makeStubServices = () => {
+  const eventIndexerPrisma = createPrismaMock();
+  eventIndexerPrisma.contractEvent.count.mockResolvedValue(0);
+  eventIndexerPrisma.contractEvent.groupBy.mockResolvedValue([]);
+  eventIndexerPrisma.contractEvent.findMany.mockResolvedValue([]);
+
+  return {
     engine: { setPreference: jest.fn(), getRecommendations: jest.fn().mockReturnValue([]) },
     exportService: {
       createJob: jest.fn().mockResolvedValue('job_1'),
@@ -126,13 +118,7 @@ const makeStubServices = () =>
       readinessCheckDatabase: jest.fn().mockResolvedValue({ up: true, latencyMs: 1 }),
       readinessCheckHorizon: jest.fn().mockResolvedValue({ up: true, latencyMs: 1 }),
       getEvents: jest.fn().mockResolvedValue([]),
-      prisma: {
-        contractEvent: {
-          count: jest.fn().mockResolvedValue(0),
-          groupBy: jest.fn().mockResolvedValue([]),
-          findMany: jest.fn().mockResolvedValue([]),
-        },
-      },
+      prisma: eventIndexerPrisma,
     },
     analyticsService: {
       getPlatformStats: jest.fn().mockResolvedValue({}),
@@ -148,7 +134,8 @@ const makeStubServices = () =>
       clearCache: jest.fn().mockResolvedValue(undefined),
     },
     feedbackService: {},
-  } as any);
+  } as any;
+};
 
 function buildApp() {
   const app = express();

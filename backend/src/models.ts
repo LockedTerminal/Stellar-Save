@@ -1,14 +1,3 @@
-// Re-export shared domain types from the SDK so backend code can import from
-// one place: `import type { Group, Contribution } from '@stellar-save/sdk'`
-export type {
-  Group as SdkGroup,
-  Contribution as SdkContribution,
-  Payout as SdkPayout,
-  ServiceCost,
-  OptimizationRecommendation,
-  CostReport,
-} from '@stellar-save/sdk';
-
 export interface UserPreference {
   userId: string;
   minContribution?: number;

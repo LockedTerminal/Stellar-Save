@@ -164,7 +164,7 @@ async function connectWallet(page: Page): Promise<void> {
 
 // ─── Suite ──────────────────────────────────────────────────────────
 
-test.describe.serial('Wallet connection & first contribution flow', () => {
+test.describe.serial('@journey Wallet connection & first contribution flow', () => {
   test.beforeAll(async () => {
     // Ensure the standalone sandbox is reachable before any tests run.
     await waitForNetwork(30_000);

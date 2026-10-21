@@ -15,6 +15,19 @@ The external API reference for the backend REST and GraphQL endpoints is publish
 
 ## Repository Layout
 
+## Workspace Status
+
+Not every top-level directory is built the same way. The table below records the
+maintenance status of directories whose role is not obvious from the build scripts.
+
+| Directory             | Status       | Notes |
+|-----------------------|--------------|-------|
+| `zk/`                 | Experimental | Zero-knowledge proof subsystem. Not built in root CI. Open HIGH-priority audit items in [`zk/CIRCUIT_AUDIT.md`](zk/CIRCUIT_AUDIT.md) tracked by issue #1327. Keep in place until the audit closes. |
+| `mobile/quarantine/`  | Active       | Triage list for flaky Maestro E2E flows. Read by `mobile/scripts/run-tests.sh`; do not archive. See [`mobile/quarantine/README.md`](mobile/quarantine/README.md). |
+
+Archived work, if any, lives under [`docs/archive/`](docs/archive/) with a status
+note explaining why it was parked.
+
 ## 🏗️ Architecture
 
 The Stellar-Save system consists of four main layers that work together to provide a decentralized ROSCA experience:
@@ -62,203 +75,24 @@ To get started quickly, follow the dedicated setup guides for each component of 
 git clone https://github.com/Xoulomon/Stellar-Save.git
 cd Stellar-Save
 
-# Install root dependencies & git hooks
-npm install
+# Install workspace dependencies & git hooks (pnpm is the only supported package manager)
+corepack enable
+pnpm install
 
 # Build Soroban smart contracts
 ./scripts/build.sh
 
 # Run all test suites across smart contracts and web frontend
 ./scripts/test.sh
-```
-
-### Run Demo
-
-Follow the step-by-step guide in [demo/demo-script.md](demo/demo-script.md).
-
-## 📖 Documentation
-
-- [Local Development Setup](docs/local-development-setup.md) — clone-to-running-app guide for backend, frontend, contracts, and mobile
-- [User Guide](docs/user-guide.md)
-- [Architecture Overview](docs/architecture.md)
-- [Public API Reference](docs/api/interactive-api-reference.md) — REST API with code examples
-- [Interactive API Docs](https://api.stellar-save.app/docs) — Try API calls in your browser
-- [Governance Process](docs/governance.md) — How protocol decisions are made on-chain
-- [Storage Layout](docs/storage-layout.md)
-- [Threat Model & Security](docs/threat-model.md)
-- [Performance Optimization Guide](docs/performance-optimization.md)
-- [Roadmap](docs/roadmap.md)
-- [Frequently Asked Questions (FAQ)](docs/faq.md)
-- [Mobile App User Guide](docs/mobile-app-guide.md)
-- [Mobile App Developer & Contributor Guide](docs/mobile-app-developer-guide.md)
-- [Troubleshooting Guide](docs/troubleshooting.md)
-- [Synthetic Monitoring / Uptime Canaries](docs/synthetic-monitoring.md)
-- [Observability Guide](docs/observability.md)
-- [Funnel & Cohort Analytics](docs/funnel-analytics.md)
-- [Design Token System](docs/design-tokens.md)
-- [ZK Verification](docs/zk-verification.md)
-- [Security Guide](docs/security-guide.md)
-
-## 🎓 Smart Contract API
-
-### Group Management
-```rust
 create_group(contribution_amount, cycle_duration, max_members) -> u64
 get_group(group_id) -> Group
 list_members(group_id) -> Vec<Address>
-```
-
-### Membership
-```rust
 join_group(group_id)
 is_member(group_id, address) -> bool
-```
-
-### Contributions
-```rust
+  
 contribute(group_id, member, amount)
 get_contribution_status(group_id, cycle_number) -> Vec<(Address, bool)>
-```
-
-### Payouts
-```rust
 execute_payout(group_id)
 is_complete(group_id) -> bool
-```
-
-### Emergency Pause
-```rust
 pause_group(group_id, caller)    // Creator-only: halt contributions & payouts
 unpause_group(group_id, caller)  // Creator-only: resume contributions & payouts
-```
-
-## 🧪 Testing
-
-Comprehensive test suite covering:
-- ✅ Group creation and configuration
-- ✅ Member joining and validation
-- ✅ Contribution flow and tracking
-- ✅ Payout rotation and distribution
-- ✅ Group completion lifecycle
-- ✅ Emergency pause/unpause scenarios
-- ✅ Error handling and edge cases
-
-Run tests:
-```bash
-cargo test
-```
-
-### Test Coverage
-
-Coverage is tracked and enforced per workspace and published to
-[Codecov](https://codecov.io/gh/Xoulomon/Stellar-Save), which provides public
-reports and historical trends.
-
-| Workspace  | Tool             | Minimum coverage gate |
-|------------|------------------|-----------------------|
-| frontend   | vitest (v8)      | 80% lines / 70% branches |
-| contracts  | cargo-tarpaulin  | 85% lines |
-| backend    | jest (ts-jest)   | 60% lines |
-
-PRs **cannot merge** if coverage falls below these targets or drops versus the
-base commit: the `coverage.yml` workflow uploads results to Codecov on every
-push and pull request, and the Codecov project/patch status checks (configured
-in [`codecov.yml`](./codecov.yml)) act as required PR merge gates. The same
-thresholds also fail CI locally via per-tool gates (tarpaulin `fail-under`,
-vitest `coverage.thresholds`, jest `coverageThreshold`).
-
-Run coverage locally:
-```bash
-# contracts
-cargo tarpaulin --config tarpaulin.toml
-# frontend
-cd frontend && npm run test:coverage
-# backend
-cd backend && npm run test:coverage
-```
-
-See [docs/test-coverage.md](docs/test-coverage.md) for full details.
-
-## 🌍 Why This Matters
-
-**Financial Inclusion**: Over 1.7 billion adults globally are unbanked. Ajo/Esusu has served African communities for generations as a trusted savings mechanism.
-
-**Blockchain Benefits**:
-- No need for a trusted coordinator
-- Transparent contribution and payout history
-- Programmable rules enforced by smart contracts
-- Accessible to anyone with a Stellar wallet
-
-**Target Users**:
-- African diaspora communities
-- Unbanked/underbanked populations
-- Small business owners needing working capital
-- Communities building financial discipline
-
-
-## 🗺️ Roadmap
-
-- **v1.0** (Current): XLM-only groups, basic functionality
-- **v1.1**: Custom token support (USDC, EURC, etc.)
-- **v2.0**: Flexible payout schedules, penalty mechanisms
-- **v3.0**: Frontend UI with wallet integration
-- **v4.0**: Mobile app, fiat on/off-ramps
-
-See [docs/roadmap.md](docs/roadmap.md) for details.
-
-## 🤝 Contributing
-
-We welcome contributions! Please:
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-See our [Code of Conduct](CODE_OF_CONDUCT.md) and [Contributing Guidelines](CONTRIBUTING.md).
-
-### 🌊 Drips Wave Contributors
-
-This project participates in **Drips Wave** - a contributor funding program! Check out:
-- **[Wave Contributor Guide](docs/wave-guide.md)** - How to earn funding for contributions
-- **[Wave-Ready Issues](docs/wave-ready-issues.md)** - 12 funded issues ready to tackle
-- **GitHub Issues** labeled with `wave-ready` - Earn 100-200 points per issue
-
-Issues are categorized as:
-- `trivial` (100 points) - Documentation, simple tests, minor fixes
-- `medium` (150 points) - Helper functions, validation logic, moderate features  
-- `high` (200 points) - Core features, complex integrations, security enhancements
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Stellar Development Foundation for Soroban
-- African communities that have practiced Ajo/Esusu for centuries
-- Drips Wave for supporting public goods funding
-
-## 📞 Contact
-
-- **Issues**: [GitHub Issues](https://github.com/Xoulomon/Stellar-Save/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/Xoulomon/Stellar-Save/discussions)
-- **Telegram**: [@Xoulomon]
-
----
-
-**Built with ❤️ for financial inclusion on Stellar**
-
-## Handsoff notes
-
-<!-- handsoff-issue-1684 -->
-- #1684: [Backend] Remove deprecated/legacy authentication code paths
-
-<!-- handsoff-issue-1685 -->
-- #1685: [Backend] Extract rate limiting logic into a single reusable middleware
-
-<!-- handsoff-issue-1704 -->
-- #1704: [Backend] Remove duplicate RPC failover logic now redundant with issue #1559 fix
-
-<!-- handsoff-issue-1706 -->
-- #1706: [Smart Contracts] Split contract.rs entrypoint into focused modules

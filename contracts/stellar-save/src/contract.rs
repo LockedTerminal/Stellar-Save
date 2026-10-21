@@ -16,7 +16,8 @@ use crate::search::{SearchParams, SearchResult};
 use crate::storage::{StorageKey, StorageKeyBuilder};
 use crate::types::{AssignmentMode, ContractConfig, MemberProfile, PayoutScheduleEntry};
 use soroban_sdk::{contract, contractimpl, Address, Bytes, Env, String, Symbol, Vec, Map, BytesN};
-use crate::{governance, milestones, payout_executor, penalty, rating, refund, search, migration};
+use core::cmp;
+use crate::{auth, governance, milestones, payout_executor, penalty, rating, refund, search, migration};
 
 #[contract]
 pub struct StellarSaveContract;
@@ -1472,6 +1473,7 @@ impl StellarSaveContract {
                 let position_order = Self::randomize_payout_order(env.clone(), group_id, seed)?;
                 let mut pos = Vec::new(&env);
                 for i in 0..position_order.len() {
+                    // INVARIANT: i < position_order.len() — loop bound
                     pos.push_back(position_order.get(i).unwrap());
                 }
                 pos
@@ -1486,6 +1488,7 @@ impl StellarSaveContract {
 
         let mut loop_idx: u32 = 0;
         for (_, member) in members.iter() {
+            // INVARIANT: loop_idx < positions.len() — positions has same length as members
             let position = positions.get(loop_idx).unwrap();
             let member_key = StorageKeyBuilder::member_profile(group_id, member.clone());
             let mut profile: MemberProfile = env
@@ -1585,8 +1588,10 @@ impl StellarSaveContract {
 
         let mut sequence = Vec::new(&env);
         for i in 0..positions.len() {
+            // INVARIANT: i < positions.len() — loop bound guarantees valid index
             let position = positions.get(i).unwrap();
             // `Vec::get` already returns an owned value; no extra clone needed (issue #1716).
+            // INVARIANT: position values are indices into member_vec (0..member_vec.len()), set by shuffle
             sequence.push_back(member_vec.get(position).unwrap());
         }
 
@@ -1599,6 +1604,7 @@ impl StellarSaveContract {
         let len = vec.len();
         for i in (1..len).rev() {
             let j = (seed.wrapping_mul(i as u64 + 1) % (i as u64 + 1)) as u32;
+            // INVARIANT: i/j < vec.len() — Fisher-Yates bounds guarantee valid indices
             let temp = vec.get(i).unwrap();
             let swap = vec.get(j).unwrap();
             vec.set(i, swap);

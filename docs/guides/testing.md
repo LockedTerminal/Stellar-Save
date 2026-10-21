@@ -1,5 +1,7 @@
 # Testing Guide
 
+> **First time?** See [docs/guides/getting-started.md](docs/guides/getting-started.md) for full environment setup before running tests.
+
 ## Overview
 
 This project uses a comprehensive testing strategy including:
@@ -7,6 +9,59 @@ This project uses a comprehensive testing strategy including:
 - **Property-based testing** (fuzzing) for contracts
 - **Code coverage** tracking with 95% threshold for contracts
 - **Mutation testing** to verify test suite quality
+
+---
+
+## Mutation Testing (`contracts/stellar-save/src/mutation_tests.rs`)
+
+`mutation_tests.rs` exists for one reason: to **kill mutants** produced by
+`cargo-mutants`. It is not a general-purpose test file — every test in it should
+fail when a specific, targeted mutation is introduced into the contract source.
+Tests that merely re-assert behaviour already covered by the property tests in
+`src/test.rs` are duplicates and should be removed rather than kept.
+
+### Running the mutation tool
+
+```bash
+# Install once (pinned tool version recommended)
+cargo install cargo-mutants --locked
+
+# Run mutation testing against the stellar-save contract only
+cd contracts/stellar-save
+cargo mutants --file src/lib.rs --file src/mutation_tests.rs
+
+# Emit a machine-readable survivor list for review
+cargo mutants --json --output mutants.json
+```
+
+`cargo mutants` recompiles the crate once per mutant and runs the test suite;
+this is slow by design. Scope it with `--file` / `--in-place` while iterating.
+
+### Recording results
+
+After each run, record the outcome in the PR description (and update this
+section when the baseline changes):
+
+| Field | Value |
+|-------|-------|
+| Tool | `cargo-mutants` |
+| Scope | `contracts/stellar-save/src/lib.rs` |
+| Mutants generated | _fill from run_ |
+| Mutants killed | _fill from run_ |
+| Survivors | _fill from run_ |
+| Kill rate | _killed / generated_ |
+| Expected kill rate | **≥ 90%** |
+
+Survivors are listed in `mutants.out/missed.txt` (or the `--json` output). Each
+survivor must either be killed by a new/kept test in `mutation_tests.rs`, or be
+explicitly justified as equivalent/unreachable in the PR.
+
+### Pruning policy
+
+- **Keep** a test only if removing it lets at least one mutant survive.
+- **Delete** tests whose assertions are already covered by the property tests
+  in `src/test.rs` (they add runtime cost without improving the kill rate).
+- Re-run `cargo mutants` after pruning and confirm the kill rate did not drop.
 
 ---
 
@@ -222,6 +277,22 @@ npm run test:coverage
 | `src/test/e2e-testnet/` | Testnet E2E tests (real SDK, real network) |
 | `src/__mocks__/@stellar/` | Shared Vitest manual mocks |
 
+### E2E suites
+
+Every frontend E2E test is assigned exactly one title tag:
+
+| Tag | Purpose | Command |
+|-----|---------|---------|
+| `@smoke` | Fast, local critical-path checks; no real-chain dependency | `npm run test:e2e` |
+| `@journey` | Full browser flows against the local app and standalone network | `npm run test:e2e:journey` |
+| `@testnet` | Tests that require a live service or Stellar testnet | `npm run test:e2e:testnet` |
+
+`test:e2e` runs only tagged smoke tests. `test:e2e:journey` runs the tagged
+Playwright browser flows. `test:e2e:testnet` runs the on-chain test runner and
+requires `.env.testnet` credentials and a deployed contract. Tests in
+`src/test/integration/` are Vitest integration tests, not E2E tests; they remain
+available through the regular `npm test run` command.
+
 ### Writing Tests
 
 ```typescript
@@ -418,5 +489,4 @@ cargo mutants --file src/penalty.rs --file src/pool.rs
 # Show caught mutants (for debugging)
 cargo mutants --caught
 ```
-
 

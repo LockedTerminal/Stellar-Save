@@ -1,5 +1,5 @@
 import type { MouseEvent, ChangeEvent } from 'react';
-import { useState, useMemo, useCallback } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Stack,
@@ -21,8 +21,8 @@ import { Link } from 'react-router-dom';
 import { copyToClipboard } from '../lib/clipboard';
 import type { MemberProfile, MemberDirectoryFilters, MemberSortOption } from '../types/member';
 import { DEFAULT_MEMBER_FILTERS } from '../types/member';
-import { formatAddress } from '../utils/formatAddress';
-import { formatAmount } from '../utils/formatAmount';
+import { formatAddress } from '@shared-utils/formatting';
+import { formatAmount } from '@shared-utils/formatting';
 
 // ── Avatar ───────────────────────────────────────────────────────────────────
 
@@ -65,6 +65,7 @@ interface MemberCardProps {
 }
 
 function MemberDirectoryCard({ member, isCurrentUser, groupId }: MemberCardProps) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const avatarColor = getAvatarColor(member.address);
   const progressPct = Math.min(100, (member.payoutPosition / Math.max(member.totalMembers, 1)) * 100);
@@ -122,7 +123,7 @@ function MemberDirectoryCard({ member, isCurrentUser, groupId }: MemberCardProps
           <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
             {formatAddress(member.address)}
           </Typography>
-          <Tooltip title={copied ? 'Copied!' : 'Copy address'}>
+          <Tooltip title={copied ? t('memberDirectory.copied') : t('memberDirectory.copyAddress')}>
             <Box
               component="button"
               onClick={handleCopy}
@@ -132,7 +133,7 @@ function MemberDirectoryCard({ member, isCurrentUser, groupId }: MemberCardProps
                 display: 'flex', alignItems: 'center',
                 '&:hover': { color: 'primary.main' },
               }}
-              aria-label="Copy address"
+              aria-label={t('memberDirectory.copyAddress')}
             >
               {copied ? (
                 <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -149,12 +150,12 @@ function MemberDirectoryCard({ member, isCurrentUser, groupId }: MemberCardProps
 
         <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'center', mt: 0.5 }}>
           <Chip
-            label={member.status.charAt(0).toUpperCase() + member.status.slice(1)}
+            label={member.status === 'active' ? t('memberDirectory.active') : member.status === 'inactive' ? t('memberDirectory.inactive') : member.status === 'pending' ? t('memberDirectory.pending') : t('memberDirectory.removed')}
             color={STATUS_COLORS[member.status]}
             size="small"
           />
-          {isCurrentUser && <Chip label="You" color="primary" size="small" variant="outlined" />}
-          {member.hasReceivedPayout && <Chip label="Paid Out" color="success" size="small" variant="outlined" />}
+          {isCurrentUser && <Chip label={t('memberDirectory.you')} color="primary" size="small" variant="outlined" />}
+          {member.hasReceivedPayout && <Chip label={t('memberDirectory.paidOut')} color="success" size="small" variant="outlined" />}
         </Box>
       </Stack>
 
@@ -164,16 +165,16 @@ function MemberDirectoryCard({ member, isCurrentUser, groupId }: MemberCardProps
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1, px: 2, py: 1.5, flexGrow: 1 }}>
         <Stack alignItems="center" spacing={0}>
           <Typography variant="subtitle2" fontWeight={700}>{member.contributionCount}</Typography>
-          <Typography variant="caption" color="text.secondary" textAlign="center">Contributions</Typography>
+          <Typography variant="caption" color="text.secondary" textAlign="center">{t('memberDirectory.contributions')}</Typography>
         </Stack>
         <Stack alignItems="center" spacing={0}>
           <Typography variant="subtitle2" fontWeight={700}>{formatAmount(member.totalContributed, { decimals: 0 })}</Typography>
-          <Typography variant="caption" color="text.secondary" textAlign="center">Total Paid</Typography>
+          <Typography variant="caption" color="text.secondary" textAlign="center">{t('memberDirectory.totalPaid')}</Typography>
         </Stack>
         <Stack alignItems="center" spacing={0}>
           <Typography variant="subtitle2" fontWeight={700}>{ordinal(member.payoutPosition)}</Typography>
           <Typography variant="caption" color="text.secondary" textAlign="center">
-            {member.hasReceivedPayout ? 'Received' : `of ${member.totalMembers}`}
+            {member.hasReceivedPayout ? t('memberDirectory.received') : t('memberDirectory.ofMembers', { count: member.totalMembers })}
           </Typography>
         </Stack>
       </Box>
@@ -181,7 +182,7 @@ function MemberDirectoryCard({ member, isCurrentUser, groupId }: MemberCardProps
       {/* Payout progress bar */}
       <Box sx={{ px: 2, pb: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-          <Typography variant="caption" color="text.secondary">Payout queue</Typography>
+          <Typography variant="caption" color="text.secondary">{t('memberDirectory.payoutQueue')}</Typography>
           <Typography variant="caption" color="text.secondary">{member.payoutPosition}/{member.totalMembers}</Typography>
         </Box>
         <Box sx={{ height: 4, bgcolor: 'action.hover', borderRadius: 2, overflow: 'hidden' }}>
@@ -196,7 +197,7 @@ function MemberDirectoryCard({ member, isCurrentUser, groupId }: MemberCardProps
         </Box>
         {member.streak !== undefined && member.streak > 1 && (
           <Typography variant="caption" color="warning.main" sx={{ mt: 0.5, display: 'block' }}>
-            🔥 {member.streak}-cycle streak
+            🔥 {t('memberDirectory.cycleStreak', { count: member.streak })}
           </Typography>
         )}
       </Box>
@@ -251,6 +252,7 @@ interface FiltersBarProps {
 }
 
 function FiltersBar({ filters, onChange, totalCount, filteredCount }: FiltersBarProps) {
+  const { t } = useTranslation();
   return (
     <Stack
       direction={{ xs: 'column', sm: 'row' }}
@@ -261,7 +263,7 @@ function FiltersBar({ filters, onChange, totalCount, filteredCount }: FiltersBar
       {/* Search */}
       <TextField
         size="small"
-        placeholder="Search by name or address…"
+        placeholder={t('memberDirectory.searchPlaceholder')}
         value={filters.search}
         onChange={(e: ChangeEvent<HTMLInputElement>) => onChange({ search: e.target.value })}
         InputProps={{
@@ -274,65 +276,65 @@ function FiltersBar({ filters, onChange, totalCount, filteredCount }: FiltersBar
           ),
         }}
         sx={{ minWidth: 220, flexGrow: 1 }}
-        inputProps={{ 'aria-label': 'Search members' }}
+        inputProps={{ 'aria-label': t('memberDirectory.searchLabel') }}
       />
 
       {/* Status filter */}
       <FormControl size="small" sx={{ minWidth: 130 }}>
-        <InputLabel id="member-status-label">Status</InputLabel>
+        <InputLabel id="member-status-label">{t('memberDirectory.status')}</InputLabel>
         <Select
           labelId="member-status-label"
-          label="Status"
+          label={t('memberDirectory.status')}
           value={filters.status}
           onChange={(e: SelectChangeEvent) => onChange({ status: e.target.value as MemberDirectoryFilters['status'] })}
         >
-          <MenuItem value="all">All</MenuItem>
-          <MenuItem value="active">Active</MenuItem>
-          <MenuItem value="inactive">Inactive</MenuItem>
-          <MenuItem value="pending">Pending</MenuItem>
+          <MenuItem value="all">{t('memberDirectory.all')}</MenuItem>
+          <MenuItem value="active">{t('memberDirectory.active')}</MenuItem>
+          <MenuItem value="inactive">{t('memberDirectory.inactive')}</MenuItem>
+          <MenuItem value="pending">{t('memberDirectory.pending')}</MenuItem>
         </Select>
       </FormControl>
 
       {/* Payout filter */}
       <FormControl size="small" sx={{ minWidth: 150 }}>
-        <InputLabel id="payout-filter-label">Payout</InputLabel>
+        <InputLabel id="payout-filter-label">{t('memberDirectory.payout')}</InputLabel>
         <Select
           labelId="payout-filter-label"
-          label="Payout"
+          label={t('memberDirectory.payout')}
           value={filters.hasReceivedPayout}
           onChange={(e: SelectChangeEvent) => onChange({ hasReceivedPayout: e.target.value as MemberDirectoryFilters['hasReceivedPayout'] })}
         >
-          <MenuItem value="all">All</MenuItem>
-          <MenuItem value="yes">Received</MenuItem>
-          <MenuItem value="no">Pending</MenuItem>
+          <MenuItem value="all">{t('memberDirectory.all')}</MenuItem>
+          <MenuItem value="yes">{t('memberDirectory.receivedFilter')}</MenuItem>
+          <MenuItem value="no">{t('memberDirectory.pendingFilter')}</MenuItem>
         </Select>
       </FormControl>
 
       {/* Sort */}
       <FormControl size="small" sx={{ minWidth: 200 }}>
-        <InputLabel id="member-sort-label">Sort by</InputLabel>
+        <InputLabel id="member-sort-label">{t('memberDirectory.sortBy')}</InputLabel>
         <Select
           labelId="member-sort-label"
-          label="Sort by"
+          label={t('memberDirectory.sortBy')}
           value={filters.sort}
           onChange={(e: SelectChangeEvent) => onChange({ sort: e.target.value as MemberSortOption })}
         >
-          <MenuItem value="contributions-desc">Most Contributions</MenuItem>
-          <MenuItem value="contributions-asc">Fewest Contributions</MenuItem>
-          <MenuItem value="join-date-desc">Newest Members</MenuItem>
-          <MenuItem value="join-date-asc">Oldest Members</MenuItem>
-          <MenuItem value="name-asc">Name A–Z</MenuItem>
-          <MenuItem value="name-desc">Name Z–A</MenuItem>
-          <MenuItem value="payout-position-asc">Payout Position ↑</MenuItem>
-          <MenuItem value="payout-position-desc">Payout Position ↓</MenuItem>
+          <MenuItem value="contributions-desc">{t('memberDirectory.mostContributions')}</MenuItem>
+          <MenuItem value="contributions-asc">{t('memberDirectory.fewestContributions')}</MenuItem>
+          <MenuItem value="join-date-desc">{t('memberDirectory.newestMembers')}</MenuItem>
+          <MenuItem value="join-date-asc">{t('memberDirectory.oldestMembers')}</MenuItem>
+          <MenuItem value="name-asc">{t('memberDirectory.nameAscending')}</MenuItem>
+          <MenuItem value="name-desc">{t('memberDirectory.nameDescending')}</MenuItem>
+          <MenuItem value="payout-position-asc">{t('memberDirectory.payoutPositionAscending')}</MenuItem>
+          <MenuItem value="payout-position-desc">{t('memberDirectory.payoutPositionDescending')}</MenuItem>
         </Select>
       </FormControl>
 
       {/* Result count */}
       <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap', alignSelf: 'center' }}>
         {filteredCount === totalCount
-          ? `${totalCount} member${totalCount !== 1 ? 's' : ''}`
-          : `${filteredCount} of ${totalCount}`}
+          ? totalCount === 1 ? t('memberDirectory.oneMember') : t('memberDirectory.manyMembers', { count: totalCount })
+          : t('memberDirectory.filteredCount', { filtered: filteredCount, total: totalCount })}
       </Typography>
     </Stack>
   );
@@ -397,20 +399,21 @@ export function MemberDirectory({
   error = null,
   currentUserAddress,
   groupId,
-  title = 'Member Directory',
+  title,
 }: MemberDirectoryProps) {
+  const { t } = useTranslation();
   const [filters, setFilters] = useState<MemberDirectoryFilters>(DEFAULT_MEMBER_FILTERS);
 
-  const handleFilterChange = useCallback((patch: Partial<MemberDirectoryFilters>) => {
+  const handleFilterChange = (patch: Partial<MemberDirectoryFilters>) => {
     setFilters((prev: MemberDirectoryFilters) => ({ ...prev, ...patch }));
-  }, []);
+  };
 
-  const handleClearFilters = useCallback(() => {
+  const handleClearFilters = () => {
     setFilters(DEFAULT_MEMBER_FILTERS);
-  }, []);
+  };
 
-  const filtered = useMemo(() => applyFilters(members, filters), [members, filters]);
-  const sorted = useMemo(() => applySort(filtered, filters.sort), [filtered, filters.sort]);
+  const filtered = applyFilters(members, filters);
+  const sorted = applySort(filtered, filters.sort);
 
   const hasActiveFilters =
     filters.search.trim() !== '' ||
@@ -420,7 +423,7 @@ export function MemberDirectory({
   return (
     <Stack spacing={3}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
-        <Typography variant="h5" fontWeight={700}>{title}</Typography>
+        <Typography variant="h5" fontWeight={700}>{title ?? t('memberDirectory.title')}</Typography>
         {hasActiveFilters && (
           <Box
             component="button"
@@ -431,7 +434,7 @@ export function MemberDirectory({
               '&:hover': { textDecoration: 'underline' },
             }}
           >
-            Clear filters
+            {t('memberDirectory.clearFilters')}
           </Box>
         )}
       </Box>
@@ -461,7 +464,7 @@ export function MemberDirectory({
           }}
         >
           <Typography variant="h6" color="text.secondary" gutterBottom>
-            {hasActiveFilters ? 'No members match your filters' : 'No members yet'}
+            {hasActiveFilters ? t('memberDirectory.noMatches') : t('memberDirectory.noMembers')}
           </Typography>
           {hasActiveFilters && (
             <Box
@@ -473,10 +476,26 @@ export function MemberDirectory({
                 '&:hover': { textDecoration: 'underline' },
               }}
             >
-              Clear filters
+              {t('memberDirectory.clearFilters')}
             </Box>
           )}
         </Box>
+      ) : sorted.length > 100 ? (
+        <VirtualizedList
+          items={sorted}
+          itemHeight={380}
+          getKey={(member) => member.address}
+          label="Member directory results"
+          renderItem={(member) => (
+            <Box sx={{ height: '100%', pb: 2, boxSizing: 'border-box' }}>
+              <MemberDirectoryCard
+                member={member}
+                isCurrentUser={member.address === currentUserAddress}
+                groupId={groupId}
+              />
+            </Box>
+          )}
+        />
       ) : (
         <Grid container spacing={2}>
           {sorted.map((member: MemberProfile) => (

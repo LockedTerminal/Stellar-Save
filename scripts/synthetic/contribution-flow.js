@@ -107,11 +107,9 @@ async function runContributionFlow(config = getConfig()) {
 async function main() {
   try {
     const result = await runContributionFlow();
-    // eslint-disable-next-line no-console
-    console.log(JSON.stringify(result));
+    process.stdout.write(`${JSON.stringify(result)}\n`);
     process.exit(0);
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error(JSON.stringify({
       check: 'savings-pool-contribution-flow',
       ok: false,

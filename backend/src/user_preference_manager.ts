@@ -2,6 +2,7 @@ import crypto from 'crypto';
 
 import { logger } from './logger';
 import { notificationPreferenceRepository } from './modules/notifications/notification-preference.repository';
+import { prisma } from './lib/prisma';
 
 /**
  * User Preference Manager Service
@@ -149,17 +150,26 @@ export class UserPreferenceManager {
    * Register device token for push notifications
    */
   static async registerDeviceToken(userId: string, deviceToken: string, platform: string) {
-    // TODO: persist via Prisma once the DeviceToken model is added to the schema.
+    const now = new Date();
+    const record = await prisma.deviceToken.upsert({
+      where: { token: deviceToken },
+      create: { userId, token: deviceToken, platform, lastSeenAt: now },
+      update: { userId, platform, lastSeenAt: now },
+    });
+
     logger.info(`Device token registered for user: ${userId}`, { platform });
-    return { userId, deviceToken, platform, registeredAt: new Date() };
+    return record;
   }
 
   /**
    * Unregister device token
    */
   static async unregisterDeviceToken(userId: string, deviceToken: string) {
+    await prisma.deviceToken.deleteMany({
+      where: { userId, token: deviceToken },
+    });
+
     logger.info(`Device token unregistered for user: ${userId}`);
-    // TODO: persist via Prisma once the DeviceToken model is added to the schema.
     return { userId, deviceToken, unregisteredAt: new Date() };
   }
 
@@ -167,9 +177,13 @@ export class UserPreferenceManager {
    * Get all device tokens for a user
    */
   static async getUserDeviceTokens(userId: string): Promise<string[]> {
-    // TODO: query via Prisma once the DeviceToken model is added to the schema.
+    const tokens = await prisma.deviceToken.findMany({
+      where: { userId },
+      select: { token: true },
+    });
+
     logger.info(`Retrieved device tokens for user: ${userId}`);
-    return [];
+    return tokens.map((entry) => entry.token);
   }
 
   /**

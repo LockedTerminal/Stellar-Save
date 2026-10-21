@@ -5,9 +5,10 @@
  * initial cache misses and improve user experience.
  */
 
-import { set } from './redis';
-import { CacheKeyBuilder } from './lib/cache-key-builder';
 import { CACHE_TTL_SECONDS } from './lib/cache-config';
+import { CacheKeyBuilder } from './lib/cache-key-builder';
+import { logger } from './lib/logger';
+import { set } from './redis';
 
 const warmData = {
   '/api/retirements': [
@@ -23,7 +24,7 @@ export const startWarmingJob = async () => {
   for (const [endpoint, data] of Object.entries(warmData)) {
     const cacheKey = CacheKeyBuilder.cacheWarming(endpoint);
     await set(cacheKey, data, CACHE_TTL_SECONDS.CACHE_WARMING_DEFAULT);
-    console.log(`Warmed: ${endpoint}`);
+    logger.info('Cache warmed endpoint', { endpoint });
   }
 
   logger.info('Cache warming completed');

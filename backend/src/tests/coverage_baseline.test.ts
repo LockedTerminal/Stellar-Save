@@ -39,18 +39,7 @@ import { logger } from '../logger';
 // ── Module-level mocks ────────────────────────────────────────────────────────
 
 jest.mock('../prisma_client', () => ({
-  prisma: {
-    apiKey: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      update: jest.fn(),
-      findMany: jest.fn(),
-    },
-    apiKeyUsage: {
-      create: jest.fn(),
-      groupBy: jest.fn(),
-    },
-  },
+  prisma: require('../../tests/helpers/prismaMock').createPrismaMock(),
 }));
 
 jest.mock('../modules/reputation/reputation.repository', () => ({

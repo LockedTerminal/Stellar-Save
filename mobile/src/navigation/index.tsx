@@ -105,13 +105,21 @@ function Tabs() {
         headerTitleStyle: { fontWeight: '700' },
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Dashboard' }} />
+      <Tab.Screen
+        name="Dashboard"
+        component={DashboardScreen}
+        options={{ title: 'Dashboard', tabBarButtonTestID: 'dashboard-tab' }}
+      />
       <Tab.Screen
         name="Groups"
         component={GroupListScreen}
-        options={{ title: 'Groups' }}
+        options={{ title: 'Groups', tabBarButtonTestID: 'groups-tab' }}
       />
-      <Tab.Screen name="Wallet" component={WalletScreen} options={{ title: 'Wallet' }} />
+      <Tab.Screen
+        name="Wallet"
+        component={WalletScreen}
+        options={{ title: 'Wallet', tabBarButtonTestID: 'wallet-tab' }}
+      />
     </Tab.Navigator>
   );
 }

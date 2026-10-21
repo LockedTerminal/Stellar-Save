@@ -103,6 +103,7 @@ const defaultSleep = (ms: number): Promise<void> =>
  * @param attempt - Zero-based index of the attempt that just failed
  * @param options - Resolved retry options
  * @returns Delay in milliseconds, never negative
+ * @internal Exported for unit tests only; not part of the package's public API.
  */
 export function computeBackoffDelay(
   attempt: number,
@@ -180,25 +181,4 @@ export async function withRetry<T>(
   }
 
   throw lastError;
-}
-
-/**
- * Builds an `isRetryable` predicate for HTTP-shaped failures.
- *
- * Transient: network errors, `408`, `429`, and `5xx` — none of which indicate
- * the server reached a verdict. Not transient: any other `4xx`, which means the
- * request was understood and rejected, so replaying it cannot help.
- *
- * @param statusOf - Extracts an HTTP status from a thrown value, if it has one
- * @returns A predicate suitable for {@link RetryOptions.isRetryable}
- */
-export function isTransientHttpError(statusOf: (error: unknown) => number | undefined) {
-  return (error: unknown): boolean => {
-    const status = statusOf(error);
-    // No status means the request never completed (DNS, TLS, socket, abort), so
-    // it is safe to replay.
-    if (status === undefined) return true;
-    if (status === 408 || status === 429) return true;
-    return status >= 500;
-  };
 }

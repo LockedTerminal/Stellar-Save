@@ -21,3 +21,21 @@ soroban-sdk = { workspace = true, features = ["testutils"] }
 [features]
 # Enable coverage instrumentation (used by cargo-tarpaulin / cargo-llvm-cov)
 coverage = []
+
+# Unfinished / not-yet-wired features — excluded from production builds by default.
+#
+# Tracking notes:
+#   group-templates  — list_templates / get_template / create_group_from_template are
+#                      implemented and tested but no #[contractimpl] entry-point in
+#                      contract.rs calls them.  Wire them when the frontend template-
+#                      picker flow is ready (see docs/group-templates.md).
+#                      GitHub tracking: add "Templates API" entry-points to contract.rs
+#                      before enabling this feature in the release profile.
+#
+#   clone-group      — clone_group / CloneOverrides are implemented and tested but
+#                      not exposed through any contract entry-point.  Wire them when
+#                      the clone-group UX is ready (see docs/admin-actions.md §clone).
+#                      GitHub tracking: add "CloneGroup" entry-point to contract.rs
+#                      before enabling this feature in the release profile.
+group-templates = []
+clone-group = []

@@ -1,7 +1,37 @@
 # E2E Test Fixtures & Mock Data
 
-This document describes all fixture data, mock configuration, and environment
-variables required to run the Maestro onboarding E2E flows.
+This document describes the local fixture mode and fixed data used by the
+Maestro flows.
+
+## Maestro build
+
+Build and install the development app with Maestro mode enabled before invoking
+`mobile/scripts/run-tests.sh`:
+
+```bash
+cd mobile
+EXPO_PUBLIC_MAESTRO_TESTING=true npx expo run:android
+```
+
+`MAESTRO_TEST_MODE` is enabled only when both `__DEV__` and
+`EXPO_PUBLIC_MAESTRO_TESTING=true` are set. In this build, authentication gates
+are bypassed and group list, lookup, create, join, and XLM balance operations
+use in-memory fixtures instead of Stellar/Horizon. A fresh application process
+restores the fixture state. Never use this development build for production.
+
+Each flow invokes `.maestro/setup.yaml`, which clears app data and launches the
+app. This keeps flows independent and starts each with the same fixture state.
+
+## Group and balance fixtures
+
+| Fixture | Value |
+|---------|-------|
+| Group 1 | Lagos Ajo Circle, 100 XLM, 30-day cycle, 2/10 members, active |
+| Group 2 | Accra Savings Circle, 50 XLM, 7-day cycle, 1/8 members, pending |
+| Wallet balance | 10,000 XLM |
+
+Groups created or joined during a flow are held in memory only and are discarded
+when the app process restarts.
 
 ---
 

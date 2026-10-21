@@ -8,7 +8,9 @@ import { NotificationFactory } from '../../test/fixtures/factory';
 
 // Mock Prisma
 jest.mock('@prisma/client', () => ({
-  PrismaClient: jest.fn(),
+  PrismaClient: jest.fn(() =>
+    require('../../tests/helpers/prismaMock').createPrismaMock()
+  ),
 }));
 
 // Mock SendGrid

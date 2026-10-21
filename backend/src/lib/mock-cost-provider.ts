@@ -11,7 +11,14 @@
  */
 
 import { BaseCostProvider } from './cost-provider';
-import type { ServiceCost, CostTrend, OptimizationRecommendation, CostReport } from './cost-provider';
+import { logger } from './logger';
+
+import type {
+  ServiceCost,
+  CostTrend,
+  OptimizationRecommendation,
+  CostReport,
+} from './cost-provider';
 
 /**
  * Configuration for mock provider behavior
@@ -51,7 +58,7 @@ export class MockCostProvider extends BaseCostProvider {
     return 'Mock';
   }
 
-  async fetchCostByService(days = 30): Promise<ServiceCost[]> {
+  async fetchCostByService(_days = 30): Promise<ServiceCost[]> {
     const costPerService = this.config.totalCost / this.config.services.length;
 
     return this.config.services.map((service) => ({
@@ -120,9 +127,18 @@ export class MockCostProvider extends BaseCostProvider {
     return recommendations;
   }
 
-  protected onCostSpikeDetected(service: string, previous: number, current: number, pctChange: number): void {
-    // Mock: just log to console (no Prometheus)
-    console.log(`[MockCostProvider] Cost spike detected for ${service}: ${pctChange.toFixed(1)}%`);
+  protected onCostSpikeDetected(
+    service: string,
+    previous: number,
+    current: number,
+    pctChange: number
+  ): void {
+    logger.info('[MockCostProvider] Cost spike detected', {
+      service,
+      previous,
+      current,
+      pctChange,
+    });
   }
 
   async buildCostReport(): Promise<CostReport> {
@@ -136,7 +152,10 @@ export class MockCostProvider extends BaseCostProvider {
 
     this.detectCostSpikes(last30DaysByService);
 
-    const totalEstimatedSavings = recommendations.reduce((s, r) => s + r.estimatedMonthlySavings, 0);
+    const totalEstimatedSavings = recommendations.reduce(
+      (s, r) => s + r.estimatedMonthlySavings,
+      0
+    );
 
     return {
       generatedAt: new Date(),

@@ -44,7 +44,7 @@ export function DeleteUserDialog({ user, adminId, onClose, onDeleted }: DeleteUs
         </Button>
         <Button
           variant="primary"
-          onClick={() => mutate({ userId: user.id, adminId })}
+          onClick={() => mutate({ userId: user.id, adminId }, { onSuccess: onDeleted })}
           loading={isPending}
         >
           Delete

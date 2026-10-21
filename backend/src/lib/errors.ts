@@ -1,100 +1,70 @@
-export interface ErrorEnvelope {
-  code: string;
-  message: string;
-  details?: unknown;
-  correlationId: string;
-  timestamp: string;
-}
-
 /**
- * Standard application error hierarchy.
+ * Typed application error hierarchy.
  *
- * Services should throw a subclass of `AppError` instead of raw `Error`s or
- * returned error objects. Each subclass carries a stable `code` and the HTTP
- * `statusCode` it maps to; `errorMiddleware` and `auth_middleware` use these
- * to build responses.
- *
- *   ValidationError   400  VALIDATION_ERROR
- *   UnauthorizedError 401  UNAUTHORIZED   (alias: AuthError)
- *   ForbiddenError    403  FORBIDDEN
- *   NotFoundError     404  NOT_FOUND
- *   ConflictError     409  CONFLICT
- *   CircuitBreakerOpenError 503 CIRCUIT_OPEN
+ * Every client-caused failure should be thrown as an `AppError` subclass so the
+ * global error handler can map it to a stable HTTP status and error code.
  */
+
+export type AppErrorCode =
+  | 'VALIDATION_ERROR'
+  | 'UNAUTHORIZED'
+  | 'NOT_FOUND'
+  | 'CONFLICT'
+  | 'UPSTREAM_FAILURE'
+  | 'INTERNAL_ERROR';
+
 export class AppError extends Error {
+  readonly status: number;
+  readonly code: AppErrorCode;
+  readonly details?: unknown;
+  readonly isOperational: boolean;
+
   constructor(
-    public readonly code: string,
     message: string,
-    public readonly statusCode: number = 500,
-    public readonly details?: unknown
+    status: number,
+    code: AppErrorCode,
+    details?: unknown,
   ) {
     super(message);
-    this.name = 'AppError';
-  }
-}
-
-export class NotFoundError extends AppError {
-  constructor(message: string, details?: unknown) {
-    super('NOT_FOUND', message, 404, details);
-    this.name = 'NotFoundError';
+    this.name = new.target.name;
+    this.status = status;
+    this.code = code;
+    this.details = details;
+    this.isOperational = true;
+    Object.setPrototypeOf(this, new.target.prototype);
   }
 }
 
 export class ValidationError extends AppError {
-  constructor(message: string, details?: unknown) {
-    super('VALIDATION_ERROR', message, 400, details);
-    this.name = 'ValidationError';
+  constructor(message = 'Validation failed', details?: unknown) {
+    super(message, 400, 'VALIDATION_ERROR', details);
   }
 }
 
-export class UnauthorizedError extends AppError {
-  constructor(message: string = 'Unauthorized', details?: unknown) {
-    super('UNAUTHORIZED', message, 401, details);
-    this.name = 'UnauthorizedError';
+export class AuthError extends AppError {
+  constructor(message = 'Unauthorized', details?: unknown) {
+    super(message, 401, 'UNAUTHORIZED', details);
   }
 }
 
-export class ForbiddenError extends AppError {
-  constructor(message: string = 'Forbidden', details?: unknown) {
-    super('FORBIDDEN', message, 403, details);
-    this.name = 'ForbiddenError';
+export class NotFoundError extends AppError {
+  constructor(message = 'Resource not found', details?: unknown) {
+    super(message, 404, 'NOT_FOUND', details);
   }
 }
 
 export class ConflictError extends AppError {
-  constructor(message: string, details?: unknown) {
-    super('CONFLICT', message, 409, details);
-    this.name = 'ConflictError';
+  constructor(message = 'Conflict', details?: unknown) {
+    super(message, 409, 'CONFLICT', details);
   }
 }
 
-export class CircuitBreakerOpenError extends AppError {
-  constructor(message: string = 'Circuit breaker is OPEN') {
-    super('CIRCUIT_OPEN', message, 503, undefined);
-    this.name = 'CircuitBreakerOpenError';
+export class UpstreamError extends AppError {
+  constructor(message = 'Upstream service failure', details?: unknown) {
+    super(message, 502, 'UPSTREAM_FAILURE', details);
   }
 }
 
-export class ImageValidationError extends AppError {
-  constructor(message: string) {
-    super('IMAGE_VALIDATION_ERROR', message, 400, undefined);
-    this.name = 'ImageValidationError';
-  }
-}
-
-export { AppError as ApiError };
-export { UnauthorizedError as AuthError };
-
-/** HTTP status code for any thrown value (500 for non-AppError). */
-export function statusCodeOf(err: unknown): number {
-  return err instanceof AppError ? err.statusCode : 500;
-}
-
-export function toEnvelope(err: unknown, correlationId: string): ErrorEnvelope {
-  const timestamp = new Date().toISOString();
-  if (err instanceof AppError) {
-    return { code: err.code, message: err.message, details: err.details, correlationId, timestamp };
-  }
-  const message = err instanceof Error ? err.message : 'An unexpected error occurred';
-  return { code: 'INTERNAL_ERROR', message, correlationId, timestamp };
+export function isAppError(err: unknown): err is AppError {
+  return err instanceof AppError;
 }

@@ -376,6 +376,7 @@ fn mark_record_recovered(env: &Env, group_id: u64, member: Address, cycle_id: u3
     // Find the first unrecovered record for this cycle and mark it recovered
     let len = history.len();
     for i in 0..len {
+        // INVARIANT: i < history.len() — loop bound guarantees valid index
         let mut rec = history.get(i).unwrap();
         if rec.cycle_id == cycle_id && !rec.recovered {
             rec.recovered = true;

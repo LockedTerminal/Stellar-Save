@@ -5,6 +5,7 @@
 
 export interface GroupCreatedEvent {
   type: 'group_created';
+  schemaVersion: number;
   groupId: bigint;
   creator: string;
   contributionAmount: bigint;
@@ -15,6 +16,7 @@ export interface GroupCreatedEvent {
 
 export interface MemberJoinedEvent {
   type: 'member_joined';
+  schemaVersion: number;
   groupId: bigint;
   member: string;
   memberCount: number;
@@ -23,6 +25,7 @@ export interface MemberJoinedEvent {
 
 export interface MemberLeftEvent {
   type: 'member_left';
+  schemaVersion: number;
   groupId: bigint;
   member: string;
   memberCount: number;
@@ -31,6 +34,7 @@ export interface MemberLeftEvent {
 
 export interface MemberRemovedEvent {
   type: 'member_removed';
+  schemaVersion: number;
   groupId: bigint;
   member: string;
   removedBy: string;
@@ -40,6 +44,7 @@ export interface MemberRemovedEvent {
 
 export interface ContributionMadeEvent {
   type: 'contribution_made';
+  schemaVersion: number;
   groupId: bigint;
   contributor: string;
   amount: bigint;
@@ -48,8 +53,19 @@ export interface ContributionMadeEvent {
   contributedAt: bigint;
 }
 
+export interface ContributionDueEvent {
+  type: 'contribution_due';
+  schemaVersion: number;
+  groupId: bigint;
+  member: string;
+  cycle: number;
+  deadline: bigint;
+  emittedAt: bigint;
+}
+
 export interface PayoutExecutedEvent {
   type: 'payout_executed';
+  schemaVersion: number;
   groupId: bigint;
   recipient: string;
   amount: bigint;
@@ -59,6 +75,7 @@ export interface PayoutExecutedEvent {
 
 export interface ContributionMissedEvent {
   type: 'contribution_missed';
+  schemaVersion: number;
   groupId: bigint;
   member: string;
   cycle: number;
@@ -68,6 +85,7 @@ export interface ContributionMissedEvent {
 
 export interface GroupCompletedEvent {
   type: 'group_completed';
+  schemaVersion: number;
   groupId: bigint;
   creator: string;
   totalCycles: number;
@@ -77,6 +95,7 @@ export interface GroupCompletedEvent {
 
 export interface GroupStatusChangedEvent {
   type: 'group_status_changed';
+  schemaVersion: number;
   groupId: bigint;
   oldStatus: number;
   newStatus: number;
@@ -86,6 +105,7 @@ export interface GroupStatusChangedEvent {
 
 export interface GracePeriodContributionEvent {
   type: 'grace_period_contribution';
+  schemaVersion: number;
   groupId: bigint;
   contributor: string;
   amount: bigint;
@@ -96,6 +116,7 @@ export interface GracePeriodContributionEvent {
 
 export interface GroupMetadataUpdatedEvent {
   type: 'group_metadata_updated';
+  schemaVersion: number;
   groupId: bigint;
   updatedBy: string;
   name: string;
@@ -106,18 +127,21 @@ export interface GroupMetadataUpdatedEvent {
 
 export interface ContractPausedEvent {
   type: 'contract_paused';
+  schemaVersion: number;
   admin: string;
   timestamp: bigint;
 }
 
 export interface ContractUnpausedEvent {
   type: 'contract_unpaused';
+  schemaVersion: number;
   admin: string;
   timestamp: bigint;
 }
 
 export interface CycleAdvancedEvent {
   type: 'cycle_advanced';
+  schemaVersion: number;
   groupId: bigint;
   oldCycle: number;
   newCycle: number;
@@ -128,6 +152,7 @@ export interface CycleAdvancedEvent {
 
 export interface GroupPausedEvent {
   type: 'group_paused';
+  schemaVersion: number;
   groupId: bigint;
   pausedBy: string;
   pausedAt: bigint;
@@ -135,6 +160,7 @@ export interface GroupPausedEvent {
 
 export interface GroupUnpausedEvent {
   type: 'group_unpaused';
+  schemaVersion: number;
   groupId: bigint;
   unpausedBy: string;
   unpausedAt: bigint;
@@ -142,6 +168,7 @@ export interface GroupUnpausedEvent {
 
 export interface ContributionVerifiedEvent {
   type: 'contribution_verified';
+  schemaVersion: number;
   groupId: bigint;
   contributor: string;
   cycle: number;
@@ -150,6 +177,7 @@ export interface ContributionVerifiedEvent {
 
 export interface ContributionAmountProposedEvent {
   type: 'contribution_amount_proposed';
+  schemaVersion: number;
   groupId: bigint;
   proposedBy: string;
   oldAmount: bigint;
@@ -159,6 +187,7 @@ export interface ContributionAmountProposedEvent {
 
 export interface ContributionAmountChangedEvent {
   type: 'contribution_amount_changed';
+  schemaVersion: number;
   groupId: bigint;
   oldAmount: bigint;
   newAmount: bigint;
@@ -168,6 +197,7 @@ export interface ContributionAmountChangedEvent {
 
 export interface PenaltyAppliedEvent {
   type: 'penalty_applied';
+  schemaVersion: number;
   groupId: bigint;
   member: string;
   amount: bigint;
@@ -177,6 +207,7 @@ export interface PenaltyAppliedEvent {
 
 export interface PenaltyRecoveredEvent {
   type: 'penalty_recovered';
+  schemaVersion: number;
   groupId: bigint;
   member: string;
   cycleId: number;
@@ -185,6 +216,7 @@ export interface PenaltyRecoveredEvent {
 
 export interface MilestoneReachedEvent {
   type: 'milestone_reached';
+  schemaVersion: number;
   groupId: bigint;
   member: string;
   threshold: number;
@@ -193,6 +225,7 @@ export interface MilestoneReachedEvent {
 
 export interface MemberInvitedEvent {
   type: 'member_invited';
+  schemaVersion: number;
   groupId: bigint;
   invited: string;
   invitedBy: string;
@@ -201,6 +234,7 @@ export interface MemberInvitedEvent {
 
 export interface InvitationRevokedEvent {
   type: 'invitation_revoked';
+  schemaVersion: number;
   groupId: bigint;
   revoked: string;
   revokedBy: string;
@@ -209,6 +243,7 @@ export interface InvitationRevokedEvent {
 
 export interface GroupsMergedEvent {
   type: 'groups_merged';
+  schemaVersion: number;
   mergedGroupId: bigint;
   sourceGroupId_1: bigint;
   sourceGroupId_2: bigint;
@@ -219,6 +254,7 @@ export interface GroupsMergedEvent {
 
 export interface RewardClaimedEvent {
   type: 'reward_claimed';
+  schemaVersion: number;
   groupId: bigint;
   member: string;
   amount: bigint;
@@ -227,6 +263,7 @@ export interface RewardClaimedEvent {
 
 export interface GroupArchivedEvent {
   type: 'group_archived';
+  schemaVersion: number;
   groupId: bigint;
   archivedBy: string;
   archivedAt: bigint;
@@ -234,6 +271,7 @@ export interface GroupArchivedEvent {
 
 export interface AutoContributionExecutedEvent {
   type: 'auto_contribution_executed';
+  schemaVersion: number;
   groupId: bigint;
   member: string;
   amount: bigint;
@@ -243,6 +281,7 @@ export interface AutoContributionExecutedEvent {
 
 export interface AutoContributionFailedEvent {
   type: 'auto_contribution_failed';
+  schemaVersion: number;
   groupId: bigint;
   member: string;
   cycle: number;
@@ -251,6 +290,7 @@ export interface AutoContributionFailedEvent {
 
 export interface GroupRatedEvent {
   type: 'group_rated';
+  schemaVersion: number;
   groupId: bigint;
   member: string;
   stars: number;
@@ -260,6 +300,7 @@ export interface GroupRatedEvent {
 
 export interface FeePaidEvent {
   type: 'fee_paid';
+  schemaVersion: number;
   creator: string;
   treasury: string;
   amount: bigint;
@@ -268,6 +309,7 @@ export interface FeePaidEvent {
 
 export interface RefundIssuedEvent {
   type: 'refund_issued';
+  schemaVersion: number;
   groupId: bigint;
   member: string;
   amount: bigint;
@@ -277,6 +319,7 @@ export interface RefundIssuedEvent {
 
 export interface MemberReferredEvent {
   type: 'member_referred';
+  schemaVersion: number;
   groupId: bigint;
   invitee: string;
   referrer: string;
@@ -285,6 +328,7 @@ export interface MemberReferredEvent {
 
 export interface GroupDissolvedEvent {
   type: 'group_dissolved';
+  schemaVersion: number;
   groupId: bigint;
   dissolvedAt: bigint;
   totalRefunded: bigint;
@@ -292,6 +336,7 @@ export interface GroupDissolvedEvent {
 
 export interface GroupClonedEvent {
   type: 'group_cloned';
+  schemaVersion: number;
   originalGroupId: bigint;
   newGroupId: bigint;
   creator: string;
@@ -300,6 +345,7 @@ export interface GroupClonedEvent {
 
 export interface CycleDeadlineExtendedEvent {
   type: 'cycle_deadline_extended';
+  schemaVersion: number;
   groupId: bigint;
   cycle: number;
   extensionSeconds: bigint;
@@ -310,6 +356,7 @@ export interface CycleDeadlineExtendedEvent {
 
 export interface ContractUpgradedEvent {
   type: 'contract_upgraded';
+  schemaVersion: number;
   upgradedBy: string;
   oldVersion: number;
   newVersion: number;
@@ -318,6 +365,7 @@ export interface ContractUpgradedEvent {
 
 export interface ContributionReceiptEvent {
   type: 'contribution_receipt';
+  schemaVersion: number;
   groupId: bigint;
   member: string;
   amount: bigint;
@@ -327,6 +375,7 @@ export interface ContributionReceiptEvent {
 
 export interface DisputeRaisedEvent {
   type: 'dispute_raised';
+  schemaVersion: number;
   groupId: bigint;
   raisedBy: string;
   reason: string;
@@ -338,6 +387,7 @@ export interface DisputeRaisedEvent {
 
 export interface DisputeResolvedEvent {
   type: 'dispute_resolved';
+  schemaVersion: number;
   groupId: bigint;
   resolvedBy: string;
   resolution: string;
@@ -350,6 +400,7 @@ export type ContractEvent =
   | MemberLeftEvent
   | MemberRemovedEvent
   | ContributionMadeEvent
+  | ContributionDueEvent
   | PayoutExecutedEvent
   | ContributionMissedEvent
   | GroupCompletedEvent
@@ -394,6 +445,7 @@ export const CONTRACT_EVENT_TOPICS: ContractEventTopic[] = [
   'member_left',
   'member_removed',
   'contribution_made',
+  'contribution_due',
   'payout_executed',
   'contribution_missed',
   'group_completed',
@@ -430,3 +482,6 @@ export const CONTRACT_EVENT_TOPICS: ContractEventTopic[] = [
   'dispute_raised',
   'dispute_resolved',
 ];
+
+/** The schema version embedded in every on-chain event payload. */
+export const CURRENT_SCHEMA_VERSION = 1;

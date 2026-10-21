@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { test } from '@playwright/test';
 
-test.describe('Accessibility Tests', () => {
+test.describe('@journey Accessibility Tests', () => {
   test('Homepage should have no critical a11y violations', async ({ page }) => {
     await page.goto('/');
     const results = await new AxeBuilder({ page }).analyze();

@@ -10,7 +10,7 @@ import {
   RoscaSection,
   SkipLink,
   TestimonialsSection,
-} from '../components/landing';
+} from '@/components/landing';
 
 /**
  * LandingPage — Full landing page for issue #436

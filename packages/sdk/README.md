@@ -1,6 +1,6 @@
 # @stellar-save/sdk
 
-Shared TypeScript SDK: contract bindings, types, and API client for Stellar-Save.
+Shared TypeScript SDK for Stellar-Save: display formatting, address validation, and shared domain types.
 
 ## Installation
 

@@ -33,14 +33,7 @@ import {
 // Mock the prisma_client module with jest.fn() stubs for all RefreshToken ops.
 
 jest.mock('../prisma_client', () => ({
-  prisma: {
-    refreshToken: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      update: jest.fn(),
-      updateMany: jest.fn(),
-    },
-  },
+  prisma: require('../../tests/helpers/prismaMock').createPrismaMock(),
 }));
 
 jest.mock('../redis', () => {

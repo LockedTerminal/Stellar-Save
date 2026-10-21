@@ -252,6 +252,9 @@ importers:
       '@stellar-save/sdk':
         specifier: workspace:*
         version: link:../packages/sdk
+      '@stellar-save/shared-utils':
+        specifier: workspace:*
+        version: link:../packages/shared-utils
       '@stellar/freighter-api':
         specifier: ^6.0.1
         version: 6.0.1

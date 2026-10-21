@@ -7,16 +7,7 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch as any;
 
 jest.mock('../prisma_client', () => ({
-  prisma: {
-    kycRecord: {
-      upsert: jest.fn(),
-      findUnique: jest.fn(),
-      update: jest.fn(),
-    },
-    kycStatusEvent: {
-      create: jest.fn(),
-    },
-  },
+  prisma: require('../../tests/helpers/prismaMock').createPrismaMock(),
 }));
 
 // KYC record fixture — built with explicit overrides matching the DB shape
