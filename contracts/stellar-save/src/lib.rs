@@ -67,6 +67,10 @@ pub mod storage_optimization;
 pub mod time_source;
 pub mod token;
 pub mod types;
+// ZK proof verification (Ed25519 Phase-1 scheme, zk/CIRCUIT_AUDIT.md).
+// Excluded from the default build — enable with `--features zk`.
+// The circuit audit must close (issue #1327) before this ships by default.
+#[cfg(feature = "zk")]
 pub mod zk_proof;
 
 // ── Unfinished / not-yet-wired features ───────────────────────────────────────
@@ -92,6 +96,13 @@ pub mod test_utils;
 // mod multi_token_tests;
 // mod mutation_tests;
 // mod upgrade_tests;
+
+// ZK test modules — only compiled when the `zk` feature is active.
+// Run with: cargo test -p stellar-save --features zk
+#[cfg(all(test, feature = "zk"))]
+mod zk_tests;
+#[cfg(all(test, feature = "zk"))]
+mod zk_integration_tests;
 
 // ── Re-exports ────────────────────────────────────────────────────────────────
 pub use auth::{is_active_member, require_admin, require_creator, require_member};

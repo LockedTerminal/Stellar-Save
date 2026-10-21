@@ -340,9 +340,9 @@ cargo doc --manifest-path Stellar-Save/contracts/stellar-save/Cargo.toml --no-de
 ## Getting Help
 
 1. **Check documentation:**
-   - POOL_CALCULATION.md - API reference
-   - BUILD_GUIDE.md - Build instructions
-   - POOL_QUICK_REFERENCE.md - Quick start
+   - ../../POOL_CALCULATION.md - API reference
+   - build-guide.md - Build instructions
+   - ../../POOL_QUICK_REFERENCE.md - Quick start
 
 2. **Review error message:**
    - Read the full error output
@@ -408,9 +408,9 @@ cargo doc --manifest-path Stellar-Save/contracts/stellar-save/Cargo.toml --no-de
    ```
 
 4. **Check documentation:**
-   - See DELIVERY_COMPLETE.md for overview
-   - See BUILD_GUIDE.md for build help
-   - See POOL_CALCULATION.md for API help
+   - See ../../DELIVERY_COMPLETE.md for overview
+   - See build-guide.md for build help
+   - See ../../POOL_CALCULATION.md for API help
 
 ---
 
