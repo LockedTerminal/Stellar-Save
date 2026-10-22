@@ -1,6 +1,7 @@
+import { config } from './config';
 import { logger } from './utils/logger';
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = config.port;
 
 async function start(): Promise<void> {
   logger.info('backend service starting', { port: PORT });

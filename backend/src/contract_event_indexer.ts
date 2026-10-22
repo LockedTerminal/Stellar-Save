@@ -79,8 +79,9 @@ export class ContractEventIndexer {
   ) {
     this.server = new Horizon.Server(horizonUrl);
     this.contractId = contractId;
-    process.env.DATABASE_URL = databaseUrl;
-    this.prisma = new PrismaClient();
+    this.prisma = databaseUrl
+      ? new PrismaClient({ datasources: { db: { url: databaseUrl } } })
+      : new PrismaClient();
     this.webPush = webPush;
   }
 
@@ -127,7 +128,8 @@ export class ContractEventIndexer {
     if (options.eventType) where.eventType = options.eventType;
     if (options.startLedger || options.endLedger) {
       where.ledgerSeq = {};
-      if (options.startLedger) (where.ledgerSeq as Record<string, unknown>).gte = options.startLedger;
+      if (options.startLedger)
+        (where.ledgerSeq as Record<string, unknown>).gte = options.startLedger;
       if (options.endLedger) (where.ledgerSeq as Record<string, unknown>).lte = options.endLedger;
     }
     if (options.startTime || options.endTime) {
@@ -190,7 +192,8 @@ export class ContractEventIndexer {
             }
             return response.json();
           });
-          const records: HorizonEventRecord[] = (data._embedded as { records?: HorizonEventRecord[] })?.records ?? [];
+          const records: HorizonEventRecord[] =
+            (data._embedded as { records?: HorizonEventRecord[] })?.records ?? [];
           span.setAttribute('indexer.records', records.length);
 
           // No new events — idle until the next poll interval.
@@ -390,7 +393,7 @@ export class ContractEventIndexer {
     const start = Date.now();
     try {
       // Lightweight connectivity test
-       
+
       await this.prisma.$queryRaw`SELECT 1`;
       return { up: true, latencyMs: Date.now() - start };
     } catch (err) {
@@ -442,7 +445,8 @@ export class ContractEventIndexer {
     if (options.eventType) where.eventType = options.eventType;
     if (options.startLedger || options.endLedger) {
       where.ledgerSeq = {};
-      if (options.startLedger) (where.ledgerSeq as Record<string, unknown>).gte = options.startLedger;
+      if (options.startLedger)
+        (where.ledgerSeq as Record<string, unknown>).gte = options.startLedger;
       if (options.endLedger) (where.ledgerSeq as Record<string, unknown>).lte = options.endLedger;
     }
     if (options.startTime || options.endTime) {

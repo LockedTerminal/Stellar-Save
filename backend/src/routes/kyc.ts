@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { config } from '../config';
 import { AppError } from '../lib/errors';
 import { logger } from '../logger';
 import { jwtAuthMiddleware } from '../modules/auth/auth_middleware';
@@ -61,7 +62,7 @@ export function createKycRouter(): Router {
 
   // POST /api/kyc/webhook — provider pushes status updates
   router.post('/webhook', async (req: Request, res: Response, next: NextFunction) => {
-    const secret = process.env['KYC_WEBHOOK_SECRET'] ?? '';
+    const secret = config.kyc.webhookSecret;
     if (secret) {
       const sig = (req.headers['x-kyc-signature'] as string) ?? '';
       const rawBody = JSON.stringify(req.body);
