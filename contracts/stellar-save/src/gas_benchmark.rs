@@ -1,7 +1,9 @@
 //! Gas Cost Profiling & Optimization Benchmark
+//! # Gas Cost Profiling & Optimization Benchmark
 //!
 //! This module profiles and benchmarks the gas (storage operation) costs for the
-//! most frequently called contract functions, with a focus on `contribute()`.
+//! most frequently called contract functions, with a focus on `contribute()` and
+//! `search_groups()` (issue #67).
 //!
 //! ## Methodology
 //! Soroban charges fees based on the number and size of storage read/write
@@ -109,6 +111,18 @@
 //!
 //! At 100 members / 100 cycles the optimizations eliminate ~29,900 storage ops,
 //! which at Stellar's fee schedule translates to a significant fee reduction.
+//!
+//! ## Storage Operation Count — `search_groups()` (per call, worst case, issue #67)
+//!
+//! | Sort variant      | Persistent reads              | In-memory comparisons      |
+//! |-------------------|-------------------------------|----------------------------|
+//! | CreatedDesc/Asc   | 1 + 2 × MAX_PAGE_SIZE = **101** | 0                        |
+//! | MemberCountDesc   | 1 + 2 × MAX_PAGE_SIZE = **101** | ≤ MAX_PAGE_SIZE² = 2,500 |
+//! | MemberCountAsc    | 1 + 2 × MAX_PAGE_SIZE = **101** | ≤ MAX_PAGE_SIZE² = 2,500 |
+//!
+//! All paths are bounded at compile time by `MAX_PAGE_SIZE` = 50.
+//! Requests above that limit are rejected with `ContractError::PageSizeTooLarge`
+//! before any storage is touched. See [`profile_search_ops`] for the full model.
 
 /// Profiles the storage operation count for `contribute()` before and after
 /// the optimizations described in this module.
@@ -232,6 +246,57 @@ pub fn profile_tick_ops() -> (u32, u32) {
     (ops_before, ops_after)
 }
 
+/// Profiles the worst-case storage operation count for `search_groups()` at
+/// the page-size limit defined by `MAX_PAGE_SIZE` (50).
+///
+/// # Read model
+/// Every candidate group ID requires **two** persistent reads:
+/// 1. `group_data(id)` — load the [`Group`] struct.
+/// 2. `group_archived(id)` — check whether the group has been archived.
+///
+/// In the worst case (all groups match the filters, scan fills the page exactly)
+/// the outer scan loop executes `MAX_PAGE_SIZE` = 50 iterations, yielding:
+///
+/// ```text
+/// reads = 2 × MAX_PAGE_SIZE = 2 × 50 = 100
+/// ```
+///
+/// One additional read is performed at the start to load the `NextGroupId`
+/// counter (to determine the scan range):
+///
+/// ```text
+/// total reads = 1 (NextGroupId) + 2 × MAX_PAGE_SIZE = 101
+/// ```
+///
+/// The `MemberCount*` sort variants add an in-memory insertion sort
+/// (O(MAX_PAGE_SIZE²) comparisons) but **zero additional storage reads** —
+/// all data is already in memory from the scan phase.
+///
+/// # Returns
+/// `(reads_scan_only, reads_member_count_sort)`
+///
+/// Both values are identical because the sort phase does not touch storage.
+/// The pair is returned for API consistency with the other `profile_*` functions.
+///
+/// # Gas bound reference (issue #67)
+/// | Sort variant      | Persistent reads | In-memory comparisons |
+/// |-------------------|------------------|-----------------------|
+/// | CreatedDesc/Asc   | 101              | 0                     |
+/// | MemberCountDesc   | 101              | ≤ MAX_PAGE_SIZE² = 2,500 |
+/// | MemberCountAsc    | 101              | ≤ MAX_PAGE_SIZE² = 2,500 |
+pub fn profile_search_ops() -> (u32, u32) {
+    use crate::search::MAX_PAGE_SIZE;
+
+    // 1 read for NextGroupId counter
+    // + 2 reads per group (group_data + group_archived) × MAX_PAGE_SIZE
+    let reads: u32 = 1 + 2 * MAX_PAGE_SIZE;
+
+    // MemberCount* sort is in-memory only — same read count.
+    let reads_with_sort: u32 = reads;
+
+    (reads, reads_with_sort)
+}
+
 /// Profiles storage operation count for `contribute_batch()` with `batch_size` cycles.
 ///
 /// Returns `(ops_before, ops_after)` for a batch contribution call.
@@ -250,6 +315,31 @@ pub fn profile_batch_contribute_ops(batch_size: u32) -> (u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_profile_search_ops_at_max_page_size() {
+        use crate::search::MAX_PAGE_SIZE;
+
+        let (reads, reads_with_sort) = profile_search_ops();
+
+        // Both variants must be equal (sort is in-memory, no extra storage reads).
+        assert_eq!(reads, reads_with_sort);
+
+        // 1 (NextGroupId) + 2 × MAX_PAGE_SIZE (group_data + group_archived per id)
+        let expected: u32 = 1 + 2 * MAX_PAGE_SIZE;
+        assert_eq!(
+            reads, expected,
+            "search_groups at MAX_PAGE_SIZE should require {} persistent reads, got {}",
+            expected, reads
+        );
+
+        // Sanity: bound must be under 200 reads (well inside Soroban instruction limits).
+        assert!(
+            reads < 200,
+            "search ops at MAX_PAGE_SIZE ({}) must be < 200 reads",
+            reads
+        );
+    }
 
     #[test]
     fn test_tick_ops_reduction() {

@@ -14,6 +14,7 @@
   },
   "scripts": {
     "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.test.json --noEmit",
     "test": "vitest run",
     "lint": "eslint src",
     "check:abi": "vitest run src/abi-drift.test.ts"

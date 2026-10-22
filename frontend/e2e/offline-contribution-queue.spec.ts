@@ -13,7 +13,7 @@ import { injectMockWallet } from './helpers/stellar-standalone';
  * 4. UI updates to reflect successful sync
  */
 
-test.describe('Offline Contribution Queue', () => {
+test.describe('@journey Offline Contribution Queue', () => {
   test('should queue contribution while offline and replay on reconnect', async ({ page, context }) => {
     // Set up mock wallet
     await injectMockWallet(page, 'contributor');

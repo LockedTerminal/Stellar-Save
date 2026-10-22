@@ -29,8 +29,6 @@ const CreateGroupPage: React.FC = () => {
     setTxError(null);
 
     try {
-      // TODO: Replace with actual Soroban contract call
-
       // Simulate a group ID returned from the contract
       const mockGroupId = `group-${Date.now()}`;
 

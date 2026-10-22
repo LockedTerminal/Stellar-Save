@@ -8,6 +8,41 @@ import type { Request, Response, NextFunction } from 'express';
 
 // ── Winston logger with JSON formatter and daily log rotation ─────────────────
 
+const SENSITIVE_KEY_REGEX =
+  /(secret|authorization|password|token|api_?key|private_?key|seed|credential)/i;
+
+/**
+ * Deeply redact sensitive keys (such as `secret`, `authorization`, private keys, etc.)
+ * in metadata objects and wallet payloads before logging.
+ */
+export function redactSensitive<T>(value: T, depth = 0): T {
+  if (depth > 10 || value === null || value === undefined) return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => redactSensitive(item, depth + 1)) as unknown as T;
+  }
+  if (
+    typeof value === 'object' &&
+    !(value instanceof Error) &&
+    !(value instanceof Date) &&
+    !(value instanceof RegExp)
+  ) {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (SENSITIVE_KEY_REGEX.test(k)) {
+        result[k] = '[REDACTED]';
+      } else if (typeof v === 'object' && v !== null) {
+        result[k] = redactSensitive(v, depth + 1);
+      } else {
+        result[k] = v;
+      }
+    }
+    return result as unknown as T;
+  }
+  return value;
+}
+
+const redactFormat = winston.format((info) => redactSensitive(info))();
+
 const jsonFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DDTHH:mm:ss.SSSZ' }),
   winston.format.errors({ stack: true }),
@@ -19,6 +54,7 @@ const jsonFormat = winston.format.combine(
     }
     return info;
   })(),
+  redactFormat,
   winston.format.json()
 );
 
@@ -44,6 +80,7 @@ const transports: winston.transport[] = [
 export const winstonLogger = winston.createLogger({
   level: config.logging.level,
   defaultMeta: { service: 'stellar-save-backend' },
+  format: redactFormat,
   transports,
 });
 
@@ -77,16 +114,19 @@ function safeStringify(value: unknown): string {
  */
 function toMeta(rest: unknown[]): Record<string, unknown> | undefined {
   if (rest.length === 0) return undefined;
+  let meta: Record<string, unknown> | undefined;
   if (rest.length === 1) {
     const [only] = rest;
     if (only === undefined || only === null) return undefined;
-    if (only instanceof Error) return errFields(only);
-    if (typeof only === 'object') return only as Record<string, unknown>;
-    return { detail: only };
+    if (only instanceof Error) meta = errFields(only);
+    else if (typeof only === 'object') meta = only as Record<string, unknown>;
+    else meta = { detail: only };
+  } else {
+    meta = {
+      detail: rest.map((r) => (r instanceof Error ? (r.stack ?? r.message) : r)),
+    };
   }
-  return {
-    detail: rest.map((r) => (r instanceof Error ? (r.stack ?? r.message) : r)),
-  };
+  return meta ? (redactSensitive(meta) as Record<string, unknown>) : undefined;
 }
 
 function emit(level: LogLevel, msg: unknown, rest: unknown[]): void {

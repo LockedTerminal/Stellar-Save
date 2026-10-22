@@ -2,8 +2,8 @@ import { Suspense, type JSX } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 import { AdminRoute } from './AdminRoute';
-import { ROUTES } from './constants';
 import { ProtectedRoute } from './ProtectedRoute';
+import { ROUTES } from './constants';
 import { RouteBoundary } from './RouteBoundary';
 import { RouteLoadingFallback } from './RouteLoadingFallback';
 import { routeConfig } from './routes';

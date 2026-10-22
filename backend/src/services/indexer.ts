@@ -1,4 +1,7 @@
+import { withRetry } from '@stellar-save/shared-utils';
+
 import { PrismaClient } from '../generated/prisma/client';
+import { horizonRetryPolicy } from '../lib/retry_policies';
 import { logger } from '../logger';
 
 export interface IndexerOptions {
@@ -27,15 +30,15 @@ export interface TransactionPage {
   offset: number;
 }
 
-interface HorizonTransaction {
+export interface HorizonTx {
   hash: string;
-  ledger?: number | string;
+  ledger: string | number;
   source_account?: string;
   fee_charged?: string;
   operation_count?: number;
   envelope_xdr?: string | null;
   result_xdr?: string | null;
-  paging_token?: string;
+  paging_token: string;
   created_at?: string;
 }
 
@@ -135,11 +138,14 @@ export class HorizonIndexer {
         url.searchParams.set('order', 'asc');
         url.searchParams.set('limit', String(this.pageSize));
 
-        const res = await fetch(url.toString());
-        if (!res.ok) throw new Error(`Horizon responded ${res.status} for ${url}`);
+        const res = await withRetry(async () => {
+          const r = await fetch(url.toString());
+          if (!r.ok) throw new Error(`Horizon responded ${r.status} for ${url}`);
+          return r;
+        }, horizonRetryPolicy);
 
-        const body = (await res.json()) as { _embedded?: { records?: HorizonTransaction[] } };
-        const records: HorizonTransaction[] = body._embedded?.records ?? [];
+        const body = (await res.json()) as { _embedded?: { records?: HorizonTx[] } };
+        const records: HorizonTx[] = body._embedded?.records ?? [];
 
         if (records.length === 0) {
           await this.delay(this.pollIntervalMs);
@@ -178,7 +184,7 @@ export class HorizonIndexer {
   }
 
   /** Upsert one transaction; the unique constraint on txHash provides deduplication. */
-  private async storeTx(tx: HorizonTransaction): Promise<void> {
+  private async storeTx(tx: HorizonTx): Promise<void> {
     try {
       await this.prisma.indexedTransaction.upsert({
         where: { txHash: tx.hash },

@@ -4,6 +4,7 @@ import { ROUTES } from '../constants';
 
 import type { RouteConfig } from '../types';
 
+
 const TransactionHistoryPage = lazy(() => import('../../pages/TransactionHistoryPage'));
 const TransactionBuilderPage = lazy(() => import('../../pages/TransactionBuilderPage'));
 const HardwareWalletPage = lazy(() => import('../../pages/HardwareWalletPage'));

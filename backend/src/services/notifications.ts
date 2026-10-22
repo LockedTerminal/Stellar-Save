@@ -9,8 +9,10 @@
  */
 
 import * as sgMail from '@sendgrid/mail';
+import { withRetry } from '@stellar-save/shared-utils';
 
 import { config } from '../config';
+import { emailRetryPolicy } from '../lib/retry_policies';
 import { logger } from '../logger';
 import { calculateReminderSchedules } from './reminder_scheduler';
 import { notificationPreferenceRepository } from '../modules/notifications/notification-preference.repository';
@@ -156,7 +158,8 @@ export async function sendContributionReminder(
     });
 
     const groupData = (groupEvent?.data as Record<string, unknown>) ?? {};
-    const groupName: string = (groupData.name as string) ?? `Group ${groupId.slice(0, 8)}`;
+    const groupName: string =
+      typeof groupData.name === 'string' ? groupData.name : `Group ${groupId.slice(0, 8)}`;
     const amount: string = String(groupData.contribution_amount ?? '—');
     const cycleNumber: string = String(groupData.current_cycle ?? '—');
 
@@ -188,14 +191,18 @@ export async function sendContributionReminder(
 
     sgMail.setApiKey(apiKey);
 
-    const [response] = await sgMail.send({
-      to: member.email,
-      from: fromEmail,
-      replyTo: config.sendgrid.replyTo,
-      subject,
-      html,
-      text,
-    });
+    const [response] = await withRetry(
+      () =>
+        sgMail.send({
+          to: member.email,
+          from: fromEmail,
+          replyTo: config.sendgrid.replyTo,
+          subject,
+          html,
+          text,
+        }),
+      emailRetryPolicy
+    );
 
     const messageId: string = (response.headers['x-message-id'] as string) ?? '';
 
@@ -342,7 +349,7 @@ export async function processDueReminders(batchSize = 50): Promise<number> {
 
     const data = (job.templateData as Record<string, unknown>) ?? {};
     const window = ((data.window as string) ?? '24h') as ReminderWindow;
-    const deadline = new Date(String(data.deadline));
+    const deadline = new Date((data.deadline as string) || Date.now());
 
     const member: Member = {
       userId: job.userId,
@@ -350,7 +357,12 @@ export async function processDueReminders(batchSize = 50): Promise<number> {
       name: (data.memberName as string) ?? job.recipient,
     };
 
-    const result = await sendContributionReminder(member, String(data.groupId), deadline, window);
+    const result = await sendContributionReminder(
+      member,
+      (data.groupId as string) || '',
+      deadline,
+      window
+    );
 
     await prisma.notificationQueue.update({
       where: { id: job.id },

@@ -9,6 +9,17 @@
 import type { GroupDetail, PublicGroup, GroupFilters } from '../types/group';
 
 export type { PublicGroup, GroupDetail };
+export type {
+  GroupRepository,
+  GroupData,
+  DetailedGroup,
+  GroupMember,
+  GroupContribution,
+  GroupCycle,
+} from '../lib/groupRepository';
+export { StubGroupRepository } from '../lib/groupRepository';
+
+import type { DetailedGroup } from '../lib/groupRepository';
 
 export interface GroupData {
   name: string;

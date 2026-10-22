@@ -79,6 +79,18 @@ export function createV2Router(services: V1Services): Router {
       try {
         const { groupId, email } = req.body;
 
+        // Look up the real group so we don't send fabricated data to clients
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const group = await (prisma as any).group.findUnique({
+          where: { id: groupId },
+          select: { id: true, name: true, creatorId: true },
+        });
+
+        if (!group) {
+          next(new AppError('GROUP_NOT_FOUND', 'Group not found', 404));
+          return;
+        }
+
         // Generate token for join link
         const joinToken = randomBytes(32).toString('hex');
 
@@ -100,8 +112,8 @@ export function createV2Router(services: V1Services): Router {
         const frontendUrl = config.urls.frontend;
         const joinLink = `${frontendUrl}/groups/join?token=${joinToken}`;
 
-        const groupName = `Group ${groupId}`; // TODO: fetch actual group name if available
-        const creatorUserId = 'unknown'; // TODO: extract from auth context
+        const groupName = group.name;
+        const creatorUserId = (req as Request & { user?: { id?: string } }).user?.id ?? group.creatorId;
 
         // Ensure a template exists in the system; use a dedicated template key.
         const templateKey = 'email_group_invitation';

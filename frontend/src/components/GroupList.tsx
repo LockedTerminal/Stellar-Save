@@ -6,7 +6,7 @@ import { EmptyState } from './EmptyState/EmptyState';
 import { Pagination } from './Pagination';
 import { SearchBar } from './SearchBar';
 import { GroupSkeleton } from './Skeleton/GroupSkeleton';
-import { applyGroupFilters } from '../lib/filters';
+import { queryGroups, type SortConfig, type SortField } from '../utils/groupListQueries';
 import './GroupList.css';
 
 export interface Group {
@@ -21,13 +21,7 @@ export interface Group {
   [key: string]: unknown;
 }
 
-type SortField = 'name' | 'memberCount' | 'createdAt';
 type SortOrder = 'asc' | 'desc';
-
-interface SortConfig {
-  field: SortField;
-  order: SortOrder;
-}
 
 interface GroupListProps {
   groups?: Group[];
@@ -96,60 +90,21 @@ export function GroupList({
     order: defaultSortOrder,
   });
 
-  // Filter groups based on search query, currency, and amount range
-  const filteredGroups = useMemo(() => {
-    return applyGroupFilters(groups, {
-      searchQuery,
-      currencyFilter,
-      minAmount,
-      maxAmount,
-    });
-  }, [groups, searchQuery, currencyFilter, minAmount, maxAmount]);
-
-  // Sort filtered groups
-  const sortedGroups = useMemo(() => {
-    const sorted = [...filteredGroups];
-
-    const direction = sortConfig.order === 'asc' ? 1 : -1;
-
-    sorted.sort((a, b) => {
-      const rawA = a[sortConfig.field];
-      const rawB = b[sortConfig.field];
-
-      // Handle undefined values — always sort them last.
-      if (rawA === undefined) return 1;
-      if (rawB === undefined) return -1;
-
-      // Normalize dates to their timestamp so they compare numerically.
-      const aValue = rawA instanceof Date ? rawA.getTime() : rawA;
-      const bValue = rawB instanceof Date ? rawB.getTime() : rawB;
-
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return (aValue - bValue) * direction;
-      }
-
-      // Fall back to a case-insensitive string comparison for everything else.
-      const aStr = String(aValue).toLowerCase();
-      const bStr = String(bValue).toLowerCase();
-
-      if (aStr < bStr) return -1 * direction;
-      if (aStr > bStr) return 1 * direction;
-      return 0;
-    });
-
-    return sorted;
-  }, [filteredGroups, sortConfig]);
-
-  // Paginate sorted groups
-  const paginatedGroups = useMemo(() => {
-    if (!showPagination) return sortedGroups;
-
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return sortedGroups.slice(startIndex, endIndex);
-  }, [sortedGroups, currentPage, pageSize, showPagination]);
-
-  const totalPages = Math.ceil(sortedGroups.length / pageSize);
+  // Single memoized query: filter → sort → paginate
+  const { items: paginatedGroups, totalCount: sortedCount, totalPages } = useMemo(
+    () =>
+      queryGroups(groups, {
+        searchQuery,
+        currencyFilter,
+        minAmount,
+        maxAmount,
+        sort: sortConfig,
+        page: currentPage,
+        pageSize,
+        paginate: showPagination,
+      }),
+    [groups, searchQuery, currencyFilter, minAmount, maxAmount, sortConfig, currentPage, pageSize, showPagination],
+  );
 
   // Reset to page 1 when search or sort changes
   const handleSearch = (value: string) => {
@@ -344,13 +299,13 @@ export function GroupList({
         )}
       </div>
 
-      {showPagination && !loading && sortedGroups.length > 0 && (
+      {showPagination && !loading && sortedCount > 0 && (
         <div className="group-list-pagination">
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
             pageSize={pageSize}
-            totalItems={sortedGroups.length}
+            totalItems={sortedCount}
             onPageChange={setCurrentPage}
             onPageSizeChange={handlePageSizeChange}
             pageSizeOptions={pageSizeOptions}

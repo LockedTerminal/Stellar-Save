@@ -5,6 +5,7 @@ mod error;
 mod xlm;
 
 use error::Error;
+use stellar_save_common::admin::require_owner;
 
 #[contract]
 pub struct GuessTheNumber;
@@ -109,11 +110,13 @@ impl GuessTheNumber {
         env.storage().instance().set(ADMIN_KEY, &admin);
     }
 
-    /// Private helper function to require auth from the admin and return the admin Address
+    /// Private helper function to require auth from the admin and return the admin Address.
+    ///
+    /// Delegates to [`stellar_save_common::admin::require_owner`] so the
+    /// instance-storage owner-auth pattern is not duplicated here and in
+    /// `nft-enumerable`.
     fn require_admin(env: &Env) -> Address {
-        let admin = Self::admin(env).expect("admin not set");
-        admin.require_auth();
-        admin
+        require_owner(env, ADMIN_KEY)
     }
 }
 
