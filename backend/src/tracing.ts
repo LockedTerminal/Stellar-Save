@@ -90,13 +90,13 @@ export function startTracing(): void {
     // OTLP/HTTP exporter. If only a base endpoint is given, the exporter appends
     // the standard /v1/traces path automatically.
     const endpoint =
-      process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT || config.tracing.otlpEndpoint + '/v1/traces';
+      config.tracing.otlpTracesEndpoint || config.tracing.otlpEndpoint + '/v1/traces';
     const exporter = new OTLPTraceExporter({ url: endpoint });
 
     const sdk = new NodeSDK({
       resource: resourceFromAttributes({
         [ATTR_SERVICE_NAME]: SERVICE_NAME,
-        [ATTR_SERVICE_VERSION]: process.env.npm_package_version || '1.0.0',
+        [ATTR_SERVICE_VERSION]: config.serviceVersion,
       }),
       sampler,
       traceExporter: exporter,

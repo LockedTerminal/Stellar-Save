@@ -1,9 +1,16 @@
 import { Router } from 'express';
 
-import { jwtAuthMiddleware } from '../modules/auth/auth_middleware';
+import { config } from '../config';
 import { AppError } from '../lib/errors';
 import { logger } from '../logger';
-import { submitKyc, getKycStatus, pollAndUpdateStatus, emitKycStatusChange, verifyKycWebhookSignature } from '../services/kyc';
+import { jwtAuthMiddleware } from '../modules/auth/auth_middleware';
+import {
+  submitKyc,
+  getKycStatus,
+  pollAndUpdateStatus,
+  emitKycStatusChange,
+  verifyKycWebhookSignature,
+} from '../services/kyc';
 
 import type { AuthenticatedRequest } from '../modules/auth/auth_middleware';
 import type { Request, Response, NextFunction } from 'express';
@@ -27,8 +34,10 @@ export function createKycRouter(): Router {
           fields,
         });
         return res.status(201).json(result);
-      } catch (err: any) {
-        logger.error('[kyc] submit error', { error: err?.message });
+      } catch (err: unknown) {
+        logger.error('[kyc] submit error', {
+          error: err instanceof Error ? err.message : String(err),
+        });
         return next(new AppError('KYC_SUBMISSION_FAILED', 'KYC submission failed', 500));
       }
     }
@@ -42,8 +51,10 @@ export function createKycRouter(): Router {
       try {
         const result = await getKycStatus(req.walletAddress!);
         return res.json(result);
-      } catch (err: any) {
-        logger.error('[kyc] status error', { error: err?.message });
+      } catch (err: unknown) {
+        logger.error('[kyc] status error', {
+          error: err instanceof Error ? err.message : String(err),
+        });
         return next(new AppError('KYC_STATUS_FETCH_FAILED', 'Failed to fetch KYC status', 500));
       }
     }
@@ -51,7 +62,7 @@ export function createKycRouter(): Router {
 
   // POST /api/kyc/webhook — provider pushes status updates
   router.post('/webhook', async (req: Request, res: Response, next: NextFunction) => {
-    const secret = process.env['KYC_WEBHOOK_SECRET'] ?? '';
+    const secret = config.kyc.webhookSecret;
     if (secret) {
       const sig = (req.headers['x-kyc-signature'] as string) ?? '';
       const rawBody = JSON.stringify(req.body);
@@ -72,8 +83,10 @@ export function createKycRouter(): Router {
         await pollAndUpdateStatus(userId);
       }
       return res.json({ ok: true });
-    } catch (err: any) {
-      logger.error('[kyc] webhook processing failed', { error: err?.message });
+    } catch (err: unknown) {
+      logger.error('[kyc] webhook processing failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return next(new AppError('KYC_WEBHOOK_PROCESSING_FAILED', 'Webhook processing failed', 500));
     }
   });

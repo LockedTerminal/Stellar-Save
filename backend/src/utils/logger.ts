@@ -9,6 +9,8 @@
  *   logger.info('server started', { port: 3000 });
  */
 
+import { config } from '../config';
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 export interface LogFields {
@@ -32,15 +34,15 @@ const LEVEL_WEIGHT: Record<LogLevel, number> = {
 };
 
 function resolveMinLevel(): LogLevel {
-  const configured = (process.env.LOG_LEVEL || 'info').toLowerCase();
+  const configured = config.logging.level.toLowerCase();
   if (configured in LEVEL_WEIGHT) {
     return configured as LogLevel;
   }
   return 'info';
 }
 
-const SERVICE_NAME = process.env.SERVICE_NAME || 'backend';
-const ENVIRONMENT = process.env.NODE_ENV || 'development';
+const SERVICE_NAME = config.serviceName;
+const ENVIRONMENT = config.nodeEnv;
 const MIN_LEVEL = resolveMinLevel();
 
 function serializeError(value: unknown): unknown {

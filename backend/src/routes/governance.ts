@@ -13,6 +13,7 @@
 
 import { Router } from 'express';
 
+import { config } from '../config';
 import { AppError } from '../lib/errors';
 
 import type { NextFunction } from 'express';
@@ -99,11 +100,7 @@ const proposals = new Map<string, Proposal>([
 ]);
 
 function getGovernors(): Set<string> {
-  const raw = process.env['GOVERNOR_ADDRESSES'] ?? '';
-  const addrs = raw
-    .split(',')
-    .map((a) => a.trim())
-    .filter(Boolean);
+  const addrs = [...config.governance.governorAddresses];
   // Seed addresses always count as governors for demo purposes
   addrs.push('GABC1234567890ABCDEF', 'GDEF0987654321FEDCBA');
   return new Set(addrs);
