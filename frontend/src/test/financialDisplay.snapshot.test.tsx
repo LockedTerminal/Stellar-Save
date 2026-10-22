@@ -1,11 +1,14 @@
 /**
- * Snapshot tests for the financially-sensitive display components.
+ * Tests for the financially-sensitive display components.
  *
  * These are the components where a rendering regression is a financial bug: a
- * user reads an amount off the screen and acts on it. A snapshot catches the
- * class of change that unit assertions miss - a dropped decimal place, a
- * changed currency label, a progress bar that stops reflecting its input, a
- * column that silently disappears.
+ * user reads an amount off the screen and acts on it. Formatted amounts,
+ * percentages, and totals are asserted explicitly against known values (see
+ * #1916) so a formatting change only passes when the displayed number is
+ * still correct. A snapshot is kept only where there is no single value to
+ * check and the thing worth guarding is the overall structure - a loading
+ * state, an empty state, or (for PayoutQueue) a known bug deliberately
+ * captured below.
  *
  * ## Why these ten
  *
@@ -47,7 +50,7 @@
  */
 process.env.TZ = 'UTC';
 
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BalanceDisplay } from '../components/BalanceDisplay';
@@ -98,7 +101,9 @@ describe('BalanceDisplay snapshots', () => {
     });
 
     const { container } = render(<BalanceDisplay />);
-    expect(container).toMatchSnapshot();
+    expect(container.querySelector('.balance-display__empty')).toHaveTextContent(
+      'Connect your wallet to view balance'
+    );
   });
 
   it('renders the XLM balance with a relative timestamp', () => {
@@ -113,7 +118,9 @@ describe('BalanceDisplay snapshots', () => {
     });
 
     const { container } = render(<BalanceDisplay />);
-    expect(container).toMatchSnapshot();
+    expect(container.querySelector('.balance-display__amount')).toHaveTextContent('1,234.5678901');
+    expect(container.querySelector('.balance-display__currency')).toHaveTextContent('XLM');
+    expect(container.querySelector('.balance-display__timestamp')).toHaveTextContent('Updated 1m ago');
   });
 
   it('renders every asset when showAllBalances is set', () => {
@@ -132,7 +139,14 @@ describe('BalanceDisplay snapshots', () => {
     });
 
     const { container } = render(<BalanceDisplay showAllBalances />);
-    expect(container).toMatchSnapshot();
+    const assets = container.querySelectorAll('.balance-display__asset');
+    expect(assets).toHaveLength(3);
+    expect(assets[0]).toHaveTextContent('XLM');
+    expect(assets[0]).toHaveTextContent('1,234.5678901');
+    expect(assets[1]).toHaveTextContent('USDC');
+    expect(assets[1]).toHaveTextContent('5,000.00');
+    expect(assets[2]).toHaveTextContent('EURC');
+    expect(assets[2]).toHaveTextContent('2,500.50');
   });
 
   it('surfaces a balance fetch error', () => {
@@ -147,7 +161,10 @@ describe('BalanceDisplay snapshots', () => {
     });
 
     const { container } = render(<BalanceDisplay />);
-    expect(container).toMatchSnapshot();
+    expect(container.querySelector('.balance-display__error-message')).toHaveTextContent(
+      'Failed to load account: horizon timeout'
+    );
+    expect(container.querySelector('.balance-display__amount')).toHaveTextContent('0.00');
   });
 });
 
@@ -163,7 +180,13 @@ describe('UserStats snapshots', () => {
 
   it('renders every total with thousands separators', () => {
     const { container } = render(<UserStats stats={stats} />);
-    expect(container).toMatchSnapshot();
+    const values = container.querySelectorAll('.stat-value');
+    expect(values[0]).toHaveTextContent('12,500 XLM');
+    expect(values[1]).toHaveTextContent('8,200.5 XLM');
+    expect(values[2]).toHaveTextContent('4');
+    expect(values[3]).toHaveTextContent('3');
+    expect(values[4]).toHaveTextContent('17');
+    expect(values[5]).toHaveTextContent('312.5 XLM');
   });
 
   it('renders zeroes without collapsing a stat', () => {
@@ -179,29 +202,51 @@ describe('UserStats snapshots', () => {
         }}
       />
     );
-    expect(container).toMatchSnapshot();
+    const values = container.querySelectorAll('.stat-value');
+    expect(values[0]).toHaveTextContent('0 XLM');
+    expect(values[1]).toHaveTextContent('0 XLM');
+    expect(values[2]).toHaveTextContent('0');
+    expect(values[3]).toHaveTextContent('0');
+    expect(values[4]).toHaveTextContent('0');
+    expect(values[5]).toHaveTextContent('0 XLM');
   });
 
   it('renders a non-XLM currency label', () => {
     const { container } = render(<UserStats stats={stats} currency="USDC" />);
-    expect(container).toMatchSnapshot();
+    const values = container.querySelectorAll('.stat-value');
+    expect(values[0]).toHaveTextContent('12,500 USDC');
+    expect(values[1]).toHaveTextContent('8,200.5 USDC');
+    expect(values[5]).toHaveTextContent('312.5 USDC');
   });
 });
 
 describe('StreakDisplay snapshots', () => {
   it('renders streaks with the next milestone and earned badges', () => {
     const { container } = render(<StreakDisplay currentStreak={12} longestStreak={19} />);
-    expect(container).toMatchSnapshot();
+    expect(screen.getByTestId('current-streak')).toHaveTextContent('12');
+    expect(screen.getByTestId('longest-streak')).toHaveTextContent('19');
+    expect(container.querySelector('.streak-progress-pct')).toHaveTextContent('60%');
+    expect(container.querySelector('.streak-progress-sub')).toHaveTextContent('12 / 20 contributions');
+    expect(screen.getByTestId('badge-5')).toBeInTheDocument();
+    expect(screen.getByTestId('badge-10')).toBeInTheDocument();
+    expect(screen.queryByTestId('badge-20')).not.toBeInTheDocument();
   });
 
   it('renders the at-risk warning', () => {
     const { container } = render(<StreakDisplay currentStreak={3} longestStreak={8} atRisk />);
-    expect(container).toMatchSnapshot();
+    expect(screen.getByTestId('current-streak')).toHaveTextContent('3');
+    expect(screen.getByTestId('longest-streak')).toHaveTextContent('8');
+    expect(screen.getByTestId('streak-warning')).toHaveTextContent(/at risk/i);
+    expect(container.querySelector('.streak-progress-pct')).toHaveTextContent('60%');
+    expect(screen.getByTestId('no-badges')).toBeInTheDocument();
   });
 
   it('renders the empty badge state below the first threshold', () => {
     const { container } = render(<StreakDisplay currentStreak={0} longestStreak={0} />);
-    expect(container).toMatchSnapshot();
+    expect(screen.getByTestId('current-streak')).toHaveTextContent('0');
+    expect(screen.getByTestId('longest-streak')).toHaveTextContent('0');
+    expect(container.querySelector('.streak-progress-pct')).toHaveTextContent('0%');
+    expect(screen.getByTestId('no-badges')).toBeInTheDocument();
   });
 });
 
@@ -234,7 +279,15 @@ describe('CycleProgress snapshots', () => {
         currentAmount={3500}
       />
     );
-    expect(container).toMatchSnapshot();
+    const stats = container.querySelectorAll('.cycle-progress-stats .stat-value');
+    expect(stats[0]).toHaveTextContent('7/10');
+    expect(stats[1]).toHaveTextContent('3,500 XLM');
+    expect(stats[2]).toHaveTextContent('5,000 XLM');
+    expect(container.querySelector('.time-value')).toHaveTextContent('5d 0h');
+    const percentages = container.querySelectorAll('.progress-percentage');
+    expect(percentages[0]).toHaveTextContent('70%');
+    expect(percentages[1]).toHaveTextContent('70%');
+    expect(container.querySelector('.cycle-progress-complete')).not.toBeInTheDocument();
   });
 
   it('renders a completed cycle at 100%', () => {
@@ -249,7 +302,15 @@ describe('CycleProgress snapshots', () => {
         status="completed"
       />
     );
-    expect(container).toMatchSnapshot();
+    const stats = container.querySelectorAll('.cycle-progress-stats .stat-value');
+    expect(stats[0]).toHaveTextContent('10/10');
+    expect(stats[1]).toHaveTextContent('5,000 XLM');
+    expect(stats[2]).toHaveTextContent('5,000 XLM');
+    expect(container.querySelector('.time-value')).toHaveTextContent('Ended');
+    const percentages = container.querySelectorAll('.progress-percentage');
+    expect(percentages[0]).toHaveTextContent('100%');
+    expect(percentages[1]).toHaveTextContent('100%');
+    expect(container.querySelector('.cycle-progress-complete')).toHaveTextContent('Cycle complete');
   });
 
   it('renders an overdue cycle', () => {
@@ -264,7 +325,15 @@ describe('CycleProgress snapshots', () => {
         status="pending"
       />
     );
-    expect(container).toMatchSnapshot();
+    const stats = container.querySelectorAll('.cycle-progress-stats .stat-value');
+    expect(stats[0]).toHaveTextContent('2/10');
+    expect(stats[1]).toHaveTextContent('1,000 XLM');
+    expect(stats[2]).toHaveTextContent('5,000 XLM');
+    expect(container.querySelector('.time-value')).toHaveTextContent('Ended');
+    const percentages = container.querySelectorAll('.progress-percentage');
+    expect(percentages[0]).toHaveTextContent('20%');
+    expect(percentages[1]).toHaveTextContent('20%');
+    expect(container.querySelector('.cycle-progress-complete')).not.toBeInTheDocument();
   });
 });
 
@@ -341,15 +410,17 @@ describe('GroupMetrics snapshots', () => {
   ];
 
   it('renders completion rate, average time, and health score', () => {
-    const { container } = render(
-      <GroupMetrics group={group} contributions={contributions} cycles={cycles} />
-    );
-    expect(container).toMatchSnapshot();
+    render(<GroupMetrics group={group} contributions={contributions} cycles={cycles} />);
+    expect(screen.getByTestId('completion-rate-value')).toHaveTextContent('75%');
+    expect(screen.getByTestId('average-time-value')).toHaveTextContent('1.0 days');
+    expect(screen.getByTestId('health-score-value')).toHaveTextContent('79/100');
   });
 
   it('renders zeroes with no contributions or cycles', () => {
-    const { container } = render(<GroupMetrics group={group} contributions={[]} cycles={[]} />);
-    expect(container).toMatchSnapshot();
+    render(<GroupMetrics group={group} contributions={[]} cycles={[]} />);
+    expect(screen.getByTestId('completion-rate-value')).toHaveTextContent('0%');
+    expect(screen.getByTestId('average-time-value')).toHaveTextContent('0 hours');
+    expect(screen.getByTestId('health-score-value')).toHaveTextContent('24/100');
   });
 });
 
@@ -368,12 +439,22 @@ describe('MemberCard snapshots', () => {
 
   it('renders the full card with totals and payout position', () => {
     const { container } = render(<MemberCard member={member} />);
-    expect(container).toMatchSnapshot();
+    const values = container.querySelectorAll('.grid-cols-3 p.text-lg');
+    expect(values[0]).toHaveTextContent('8');
+    expect(values[1]).toHaveTextContent('4000 XLM');
+    expect(values[2]).toHaveTextContent('3rd');
+    expect(container.querySelector('.grid-cols-3')).toHaveTextContent('of 10');
+    expect(container.querySelector('.px-5.pb-4')).toHaveTextContent('3 / 10');
+    expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(screen.queryByText('You')).not.toBeInTheDocument();
   });
 
   it('renders the current user with a You marker', () => {
     const { container } = render(<MemberCard member={member} isCurrentUser />);
-    expect(container).toMatchSnapshot();
+    expect(screen.getByText('You')).toBeInTheDocument();
+    const values = container.querySelectorAll('.grid-cols-3 p.text-lg');
+    expect(values[1]).toHaveTextContent('4000 XLM');
+    expect(values[2]).toHaveTextContent('3rd');
   });
 
   it('renders a member who has already been paid', () => {
@@ -388,12 +469,19 @@ describe('MemberCard snapshots', () => {
         }}
       />
     );
-    expect(container).toMatchSnapshot();
+    const values = container.querySelectorAll('.grid-cols-3 p.text-lg');
+    expect(values[1]).toHaveTextContent('4000 XLM');
+    expect(values[2]).toHaveTextContent('1st');
+    expect(container.querySelector('.grid-cols-3')).toHaveTextContent('Received');
+    expect(container.querySelector('.px-5.pb-4')).toHaveTextContent('1 / 10');
+    expect(screen.getByText('Inactive')).toBeInTheDocument();
   });
 
   it('renders the compact variant', () => {
-    const { container } = render(<MemberCard member={member} compact />);
-    expect(container).toMatchSnapshot();
+    render(<MemberCard member={member} compact />);
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+    expect(screen.getByText('8 contributions')).toBeInTheDocument();
+    expect(screen.getByText('Active')).toBeInTheDocument();
   });
 });
 
@@ -433,7 +521,23 @@ describe('PayoutQueue snapshots', () => {
 
   it('renders completed, next, and upcoming payouts', () => {
     const { container } = render(<PayoutQueue data={data} />);
-    expect(container).toMatchSnapshot();
+    const header = container.querySelector('.bg-gradient-to-r.from-indigo-600');
+    expect(header).toHaveTextContent('Cycle #5');
+    expect(header).toHaveTextContent('1 of 6 paid out');
+    expect(header).toHaveTextContent('17%');
+
+    const amounts = container.querySelectorAll('.text-sm.font-bold.text-gray-800');
+    expect(amounts[0]).toHaveTextContent('500 XLM');
+    expect(amounts[1]).toHaveTextContent('750.25 XLM');
+    expect(amounts[2]).toHaveTextContent('1000 XLM');
+
+    expect(screen.getByText('Paid')).toBeInTheDocument();
+    expect(screen.getByText('Next')).toBeInTheDocument();
+    expect(screen.getByText('Upcoming')).toBeInTheDocument();
+
+    const footer = container.querySelector('.border-t.border-gray-100.px-5.py-3');
+    expect(footer).toHaveTextContent('6 total members');
+    expect(footer).toHaveTextContent('2 remaining');
   });
 
   /**
@@ -494,10 +598,15 @@ describe('TransactionTables snapshots', () => {
   ];
 
   it('renders a populated transaction list', () => {
-    const { container } = render(
-      <TransactionTables transactions={transactions} isLoading={false} onRowClick={() => {}} />
-    );
-    expect(container).toMatchSnapshot();
+    render(<TransactionTables transactions={transactions} isLoading={false} onRowClick={() => {}} />);
+    // Date column uses a bare toLocaleDateString() with no locale argument (a
+    // latent flakiness bug noted above), so only the deterministic financial
+    // fields are asserted here.
+    expect(screen.getByText('1500.25 XLM')).toBeInTheDocument();
+    expect(screen.getByText('-320.10 USDC')).toBeInTheDocument();
+    expect(screen.getByText('-99 XLM')).toBeInTheDocument();
+    expect(screen.getAllByText('success')).toHaveLength(2);
+    expect(screen.getByText('failed')).toBeInTheDocument();
   });
 
   it('renders the loading state', () => {
@@ -544,8 +653,12 @@ describe('dashboard TransactionTable snapshots', () => {
   ];
 
   it('renders recent transactions with signed amounts and status chips', () => {
-    const { container } = render(<DashboardTransactionTable transactions={transactions} />);
-    expect(container).toMatchSnapshot();
+    render(<DashboardTransactionTable transactions={transactions} />);
+    expect(screen.getByText('-2,500 XLM')).toBeInTheDocument();
+    expect(screen.getByText('+750.5 XLM')).toBeInTheDocument();
+    expect(screen.getByText('-0.5 XLM')).toBeInTheDocument();
+    expect(screen.getAllByText('PAID')).toHaveLength(2);
+    expect(screen.getByText('PENDING')).toBeInTheDocument();
   });
 
   it('renders the loading state', () => {

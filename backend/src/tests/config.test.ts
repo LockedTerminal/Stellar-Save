@@ -94,13 +94,18 @@ describe('Config - Database URL Construction', () => {
 
 describe('Config - Validation & Schema', () => {
   const originalEnv = process.env;
+  let exitSpy: jest.SpyInstance;
 
   beforeEach(() => {
     jest.resetModules();
     process.env = { ...originalEnv };
+    exitSpy = jest.spyOn(process, 'exit').mockImplementation((() => {
+      throw new Error('process.exit(1)');
+    }) as unknown as (code?: string | number | null | undefined) => never);
   });
 
   afterEach(() => {
+    exitSpy.mockRestore();
     process.env = originalEnv;
   });
 

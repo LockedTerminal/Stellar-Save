@@ -18,6 +18,12 @@ export interface ErrorBoundaryState {
   retryCount: number;
 }
 
+function isChunkLoadError(error: Error | null | undefined): boolean {
+  return !!error && /chunkloaderror|loading (?:css )?chunk|failed to fetch dynamically imported module|importing a module script failed/i.test(
+    error.message
+  );
+}
+
 // NOTE: Intentional class component exception (see issue #1265).
 // React has no hooks-based equivalent for `getDerivedStateFromError` /
 // `componentDidCatch`, so error boundaries must be class components.
@@ -90,6 +96,13 @@ export class ErrorBoundary extends React.Component<
   };
 
   handleRetry = () => {
+    if (isChunkLoadError(this.state.error)) {
+      // React.lazy caches a rejected import promise; remounting the boundary
+      // alone would render the same rejection. A reload retries the chunk URL.
+      window.location.reload();
+      return;
+    }
+
     const { retryCount } = this.state;
     if (retryCount < this.maxRetries) {
       this.setState({

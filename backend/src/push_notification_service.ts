@@ -7,21 +7,34 @@ import { deviceTokenService } from './device_token_service';
 import { logger } from './logger';
 
 /**
- * Abstract interface for push notification providers
+ * Unified push provider interface (Issue #1872).
+ * Every push SDK call must go through an implementation of this interface.
  */
-export interface PushNotificationProvider {
+export interface PushProvider {
   send(
     deviceToken: string,
     title: string,
     body: string,
     data?: Record<string, string>
   ): Promise<string>;
+  sendBatch(
+    deviceTokens: string[],
+    title: string,
+    body: string,
+    data?: Record<string, string>
+  ): Promise<string[]>;
+  invalidateToken(deviceToken: string): Promise<void>;
 }
+
+/**
+ * Backwards-compatible alias for the previous provider interface name.
+ */
+export type PushNotificationProvider = PushProvider;
 
 /**
  * Firebase Cloud Messaging (FCM) Provider
  */
-export class FirebaseProvider implements PushNotificationProvider {
+export class FirebasePushProvider implements PushProvider {
   private projectId: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Firebase service account is parsed from raw JSON; typed by Firebase Admin SDK not yet integrated
   private serviceAccount: Record<string, unknown>;
@@ -56,13 +69,26 @@ export class FirebaseProvider implements PushNotificationProvider {
       throw error;
     }
   }
+
+  async sendBatch(
+    deviceTokens: string[],
+    title: string,
+    body: string,
+    data?: Record<string, string>
+  ): Promise<string[]> {
+    return Promise.all(deviceTokens.map((token) => this.send(token, title, body, data)));
+  }
+
+  async invalidateToken(deviceToken: string): Promise<void> {
+    await deviceTokenService.removeToken(deviceToken);
+  }
 }
 
 /**
  * Apple Push Notification service (APNs) Provider
  * Uses HTTP/2 + JWT authentication
  */
-export class ApnsProvider implements PushNotificationProvider {
+export class ApnsProvider implements PushProvider {
   private keyId: string;
   private teamId: string;
   private privateKey: string;
@@ -138,12 +164,25 @@ export class ApnsProvider implements PushNotificationProvider {
       req.end();
     });
   }
+
+  async sendBatch(
+    deviceTokens: string[],
+    title: string,
+    body: string,
+    data?: Record<string, string>
+  ): Promise<string[]> {
+    return Promise.all(deviceTokens.map((token) => this.send(token, title, body, data)));
+  }
+
+  async invalidateToken(deviceToken: string): Promise<void> {
+    await deviceTokenService.removeToken(deviceToken);
+  }
 }
 
 /**
  * OneSignal Provider
  */
-export class OneSignalProvider implements PushNotificationProvider {
+export class OneSignalPushProvider implements PushProvider {
   private appId: string;
   private apiKey: string;
   private baseUrl: string = 'https://onesignal.com/api/v1';
@@ -177,6 +216,41 @@ export class OneSignalProvider implements PushNotificationProvider {
       throw error;
     }
   }
+
+  async sendBatch(
+    deviceTokens: string[],
+    title: string,
+    body: string,
+    data?: Record<string, string>
+  ): Promise<string[]> {
+    return Promise.all(deviceTokens.map((token) => this.send(token, title, body, data)));
+  }
+
+  async invalidateToken(deviceToken: string): Promise<void> {
+    await deviceTokenService.removeToken(deviceToken);
+  }
+}
+
+/**
+ * No-op provider used when no push credentials are configured.
+ * Logs a single warning at construction and silently accepts sends.
+ */
+export class NoopPushProvider implements PushProvider {
+  constructor(log: { warn: (...a: unknown[]) => void } = logger) {
+    log.warn('No push provider credentials configured; using NoopPushProvider');
+  }
+
+  async send(): Promise<string> {
+    return 'noop';
+  }
+
+  async sendBatch(deviceTokens: string[]): Promise<string[]> {
+    return deviceTokens.map(() => 'noop');
+  }
+
+  async invalidateToken(): Promise<void> {
+    // no-op
+  }
 }
 
 /**
@@ -187,7 +261,7 @@ export class OneSignalProvider implements PushNotificationProvider {
  * - Providers, defaultProvider, config, and logger can be injected
  */
 export interface PushNotificationServiceDeps {
-  providers?: Map<string, PushNotificationProvider>;
+  providers?: Map<string, PushProvider>;
   defaultProvider?: string;
   config?: {
     push: {
@@ -202,7 +276,7 @@ export interface PushNotificationServiceDeps {
 }
 
 export class PushNotificationService {
-  private providers: Map<string, PushNotificationProvider> = new Map();
+  private providers: Map<string, PushProvider> = new Map();
   private defaultProvider: string;
   private readonly log: NonNullable<PushNotificationServiceDeps['logger']>;
 
@@ -222,7 +296,7 @@ export class PushNotificationService {
     // Firebase provider
     if (resolvedConfig.push.firebase.projectId && resolvedConfig.push.firebase.serviceAccount) {
       try {
-        const firebase = new FirebaseProvider(
+        const firebase = new FirebasePushProvider(
           resolvedConfig.push.firebase.projectId,
           resolvedConfig.push.firebase.serviceAccount
         );
@@ -236,7 +310,7 @@ export class PushNotificationService {
     // OneSignal provider
     if (resolvedConfig.push.onesignal.appId && resolvedConfig.push.onesignal.apiKey) {
       try {
-        const oneSignal = new OneSignalProvider(
+        const oneSignal = new OneSignalPushProvider(
           resolvedConfig.push.onesignal.appId,
           resolvedConfig.push.onesignal.apiKey
         );
@@ -269,99 +343,44 @@ export class PushNotificationService {
       }
     }
 
+    // Fall back to a no-op provider when nothing is configured so callers
+    // always have a provider to route through (Issue #1872).
     if (this.providers.size === 0) {
-      this.log.warn('No push notification providers configured');
+      this.providers.set('noop', new NoopPushProvider(this.log));
+      this.defaultProvider = 'noop';
     }
   }
 
-  /**
-   * Send push notification via default provider
-   */
+  getProvider(name?: string): PushProvider {
+    const key = name ?? this.defaultProvider;
+    const provider = this.providers.get(key);
+    if (!provider) {
+      throw new Error(`Push provider not configured: ${key}`);
+    }
+    return provider;
+  }
+
   async send(
     deviceToken: string,
     title: string,
     body: string,
-    data?: Record<string, string>
+    data?: Record<string, string>,
+    providerName?: string
   ): Promise<string> {
-    const provider = this.providers.get(this.defaultProvider);
-
-    if (!provider) {
-      logger.warn(`Default provider '${this.defaultProvider}' not available`);
-      return 'no-provider';
-    }
-
-    return await provider.send(deviceToken, title, body, data);
+    return this.getProvider(providerName).send(deviceToken, title, body, data);
   }
 
-  /**
-   * Send push notification via specific provider
-   */
-  async sendVia(
-    providerName: string,
-    deviceToken: string,
+  async sendBatch(
+    deviceTokens: string[],
     title: string,
     body: string,
-    data?: Record<string, string>
-  ): Promise<string> {
-    const provider = this.providers.get(providerName);
-
-    if (!provider) {
-      throw new Error(`Provider '${providerName}' not configured`);
-    }
-
-    return await provider.send(deviceToken, title, body, data);
+    data?: Record<string, string>,
+    providerName?: string
+  ): Promise<string[]> {
+    return this.getProvider(providerName).sendBatch(deviceTokens, title, body, data);
   }
 
-  /**
-   * Get list of available providers
-   */
-  getAvailableProviders(): string[] {
-    return Array.from(this.providers.keys());
-  }
-
-  /**
-   * Check if a provider is available
-   */
-  isProviderAvailable(providerName: string): boolean {
-    return this.providers.has(providerName);
-  }
-
-  /**
-   * Send to all mobile device tokens for a user, routing iOS to APNs and Android to Firebase.
-   * Prunes invalid tokens on provider rejection.
-   */
-  async sendToUserMobile(
-    userId: string,
-    title: string,
-    body: string,
-    data?: Record<string, string>
-  ): Promise<void> {
-    const tokens = await deviceTokenService.getTokensForUser(userId);
-    if (tokens.length === 0) return;
-
-    await Promise.allSettled(
-      tokens.map(async ({ token, platform }) => {
-        const providerName = platform === 'ios' ? 'apns' : 'firebase';
-        const provider = this.providers.get(providerName);
-        if (!provider) {
-          logger.warn(`No provider for platform ${platform}`);
-          return;
-        }
-        try {
-          await provider.send(token, title, body, data);
-        } catch (err: unknown) {
-          // 410 (APNs Gone) or 404 (FCM invalid) => prune token
-          const statusCode = (err as { statusCode?: number }).statusCode;
-          if (statusCode === 410 || statusCode === 404) {
-            await deviceTokenService.markTokenInvalid(token);
-            logger.info('Pruned invalid mobile token', { platform });
-          } else {
-            logger.error('Mobile push failed', { platform, error: String(err) });
-          }
-        }
-      })
-    );
+  async invalidateToken(deviceToken: string, providerName?: string): Promise<void> {
+    return this.getProvider(providerName).invalidateToken(deviceToken);
   }
 }
-
-export const pushNotificationService = new PushNotificationService();

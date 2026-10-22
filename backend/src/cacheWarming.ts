@@ -24,7 +24,7 @@ export const startWarmingJob = async () => {
   for (const [endpoint, data] of Object.entries(warmData)) {
     const cacheKey = CacheKeyBuilder.cacheWarming(endpoint);
     await set(cacheKey, data, CACHE_TTL_SECONDS.CACHE_WARMING_DEFAULT);
-    logger.info(`Warmed: ${endpoint}`);
+    logger.info('Cache warmed endpoint', { endpoint });
   }
 
   logger.info('Cache warming completed');

@@ -337,23 +337,11 @@ mod escrow_property_tests {
             prop_assert_eq!(partial_total, amount * contributed as i128);
         }
 
-        /// Feature: Escrow  Property 7
-        ///
-        /// A single credited amount is never mutated: reading the amount back
-        /// from a ContributionRecord always returns the originally stored value.
-        #[test]
-        fn prop_escrow_credited_amount_is_immutable(
-            amount in positive_amount(),
-            cycle in any_cycle(),
-            gid in any_group_id(),
-        ) {
-            let env = Env::default();
-            let member = Address::generate(&env);
-            let rec = ContributionRecord::new(member, gid, cycle, amount, 0);
-            // Reading back must always return the same value.
-            prop_assert_eq!(rec.amount, amount);
-            prop_assert_eq!(rec.amount, amount); // idempotent
-        }
+        // prop_escrow_credited_amount_is_immutable removed: it verified only that
+        // ContributionRecord::amount == the value passed to new(), which is a strict
+        // subset of fuzz_tests::prop_contribution_amount_stored_exactly, which checks
+        // amount, cycle_number, and group_id in a single property.  Keeping the
+        // more comprehensive test avoids running the same assertion twice.
     }
 
     // ── Feature: Escrow Properties 8–14 (Partial Withdrawal & Concurrency) ───

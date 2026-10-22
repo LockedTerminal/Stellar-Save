@@ -71,6 +71,8 @@ pub fn vote_dissolve(env: Env, group_id: u64, caller: Address) -> Result<(), Ste
     gov_storage::set_dissolve_vote_count(&env, group_id, new_count);
 
     // Not unanimous yet — nothing more to do.
+    // Dissolution requires unanimity: every member must vote.
+    // See `crate::constants::GOVERNANCE_DISSOLUTION_REQUIRES_UNANIMITY`.
     if new_count < group.member_count {
         return Ok(());
     }
@@ -133,7 +135,7 @@ pub fn vote_contribution_change(
     gov_storage::set_contribution_vote_count(&env, group_id, new_vote_count);
 
     // ── Apply if majority reached (> 50 % of members) ────────────────────────
-    let majority = group.member_count / 2 + 1;
+    let majority = super::majority_threshold(group.member_count);
     if new_vote_count >= majority {
         execution::execute_contribution_change(&env, group_id, &mut group, new_amount)?;
     }

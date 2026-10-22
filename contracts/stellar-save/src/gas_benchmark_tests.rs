@@ -34,7 +34,6 @@ mod benchmarks {
         storage::StorageKeyBuilder,
         Group as _,
         MemberProfile,
-        StellarSaveContract,
         StellarSaveContractClient,
     };
 
@@ -61,7 +60,7 @@ mod benchmarks {
         stroops as f64 / STROOPS_PER_XLM as f64
     }
 
-    // ─── Test environment helpers ─────────────────────────────────────────────
+    // ─── Test environment helpers (using TestHarness) ─────────────────────────
 
     struct BenchEnv {
         env: Env,
@@ -69,20 +68,20 @@ mod benchmarks {
         token_address: Address,
     }
 
+    /// Build a benchmark environment using [`crate::test_utils::TestHarness`]
+    /// so all env/contract/token setup is in one place, then reset the budget
+    /// to unlimited for measurement purposes.
     fn setup() -> BenchEnv {
-        let env = Env::default();
-        env.mock_all_auths();
-        env.budget().reset_unlimited();
-
-        let contract_id = env.register(StellarSaveContract, ());
-        let token_address = env
-            .register_stellar_asset_contract_v2(Address::generate(&env))
-            .address();
-
-        BenchEnv { env, contract_id, token_address }
+        let h = crate::test_utils::TestHarness::new();
+        h.env.budget().reset_unlimited();
+        BenchEnv {
+            token_address: h.token.clone(),
+            contract_id: h.contract_id.clone(),
+            env: h.env,
+        }
     }
 
-    /// Registers a Stellar Asset Contract and mints tokens to `addr`.
+    /// Mints `amount` stroops of the bench token to `addr`.
     fn mint_tokens(b: &BenchEnv, addr: &Address, amount: i128) {
         soroban_sdk::token::StellarAssetClient::new(&b.env, &b.token_address)
             .mint(addr, &amount);

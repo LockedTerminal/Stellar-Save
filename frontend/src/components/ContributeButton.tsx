@@ -3,7 +3,8 @@ import type { ContributeButtonProps } from '../types/contribution';
 import { ContributionSuccessModal } from './ContributionSuccessModal';
 import { Dialog } from './Dialog';
 import { useTransaction, explorerUrl } from '../hooks/useTransaction';
-import { useContract } from '../hooks/useContract';
+import { useGroupRepository } from '../lib/GroupRepositoryContext';
+import { logger } from '../lib/logger';
 
 // ── Confirmation Modal ──────────────────────────────────────────────────────
 
@@ -80,7 +81,7 @@ export function ContributeButton({
   disabled = false,
 }: ContributeButtonProps) {
   const { state, txHash, error, execute, reset } = useTransaction();
-  const { contribute } = useContract();
+  const groupRepository = useGroupRepository();
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -98,7 +99,8 @@ export function ContributeButton({
   const handleConfirm = async () => {
     setShowConfirm(false);
     await execute(async () => {
-      const result = await contribute({
+      logger.debug('Submitting contribution', { cycleId, amount });
+      const result = await groupRepository.contribute({
         groupId: BigInt(cycleId),
         amount: BigInt(Math.round(amount * 10_000_000)),
       });
@@ -128,7 +130,7 @@ export function ContributeButton({
 
   // Fire callbacks after state settles
   if (state === 'confirmed' && txHash && !showSuccess) {
-    // handled via showSuccess flag below
+    logger.info('Contribution confirmed', { cycleId });
   }
 
   return (
