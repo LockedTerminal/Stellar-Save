@@ -36,8 +36,8 @@ export interface HorizonTx {
   source_account?: string;
   fee_charged?: string;
   operation_count?: number;
-  envelope_xdr?: string;
-  result_xdr?: string;
+  envelope_xdr?: string | null;
+  result_xdr?: string | null;
   paging_token: string;
   created_at?: string;
 }

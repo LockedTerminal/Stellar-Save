@@ -5,11 +5,11 @@ import { prisma } from '@app/backend/prisma_client';
 export class AnalyticsHandler {
   private analyticsService: AnalyticsService;
 
-  constructor(dbClient: any = prisma) {
+  constructor(dbClient: ConstructorParameters<typeof AnalyticsService>[0] = prisma) {
     this.analyticsService = new AnalyticsService(dbClient);
   }
 
-  async execute(lookbackHours: number = 25): Promise<any> {
+  async execute(lookbackHours: number = 25): Promise<unknown> {
     try {
       const result = await this.analyticsService.resyncSorobanAnalytics({ lookbackHours });
       logger.info('Analytics resync completed', result);

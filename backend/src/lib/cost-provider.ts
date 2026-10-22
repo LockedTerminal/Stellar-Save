@@ -12,8 +12,6 @@
  *   const report = await costManager.buildCostReport();
  */
 
-import type { Gauge, Counter } from 'prom-client';
-
 /**
  * Represents a cost breakdown for a single service/component.
  */
@@ -120,7 +118,7 @@ export interface CostProvider {
    * Should set up all custom metrics and gauges.
    * @param registry Prometheus registry to register metrics with
    */
-  registerMetrics?(registry: any): void;
+  registerMetrics?(registry: unknown): void;
 
   /**
    * Get the human-readable name of this provider (e.g., 'AWS', 'GCP').
@@ -164,11 +162,16 @@ export abstract class BaseCostProvider implements CostProvider {
    * Called when a cost spike is detected.
    * Override in subclasses to implement provider-specific handling.
    */
-  protected onCostSpikeDetected(service: string, previous: number, current: number, pctChange: number): void {
+  protected onCostSpikeDetected(
+    _service: string,
+    _previous: number,
+    _current: number,
+    _pctChange: number
+  ): void {
     // Default: no-op. Subclasses should implement logging, alerts, metrics, etc.
   }
 
-  registerMetrics?(registry: any): void {
+  registerMetrics?(_registry: unknown): void {
     // Optional: no-op by default. Subclasses can override.
   }
 }

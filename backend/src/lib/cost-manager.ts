@@ -13,9 +13,17 @@
  *   const manager = new CostManager(provider);
  */
 
-import type { CostProvider, CostReport, ServiceCost, CostTrend, OptimizationRecommendation } from './cost-provider';
 import { AwsCostProvider } from './aws-cost-provider';
 import { MockCostProvider } from './mock-cost-provider';
+
+import type {
+  CostProvider,
+  CostReport,
+  ServiceCost,
+  CostTrend,
+  OptimizationRecommendation,
+} from './cost-provider';
+import type { MockCostProviderConfig } from './mock-cost-provider';
 
 /**
  * Cost Manager
@@ -32,7 +40,7 @@ export class CostManager {
    * @param config Optional configuration for the provider
    * @returns CostManager instance
    */
-  static create(providerType: string = 'AWS', config?: any): CostManager {
+  static create(providerType: string = 'AWS', config?: MockCostProviderConfig): CostManager {
     let provider: CostProvider;
 
     switch (providerType.toUpperCase()) {
@@ -101,7 +109,7 @@ export class CostManager {
   /**
    * Register provider-specific metrics (if any).
    */
-  registerMetrics?(registry: any): void {
+  registerMetrics?(registry: unknown): void {
     this.provider.registerMetrics?.(registry);
   }
 

@@ -9,16 +9,16 @@ import { StellarClient } from '../lib/stellar_client';
 import { logger } from '../logger';
 import { KeeperHandler } from './handlers/keeper.handler';
 
-import type { IStellarClient} from '../lib/stellar_client';
+import type { IStellarClient } from '../lib/stellar_client';
 
 export class KeeperJob {
   private contractId: string;
   private stellarClient: IStellarClient;
-  private db: any;
+  private db: unknown;
   private task?: CronJob;
   private handler?: KeeperHandler;
 
-  constructor(contractId: string, rpcUrlOrClient: string | IStellarClient, dbClient?: any) {
+  constructor(contractId: string, rpcUrlOrClient: string | IStellarClient, dbClient?: unknown) {
     this.contractId = contractId;
     if (typeof rpcUrlOrClient === 'string') {
       this.stellarClient = new StellarClient(rpcUrlOrClient);
@@ -57,7 +57,7 @@ export function startKeeperJob(
   schedule: string,
   contractId: string,
   rpcUrlOrClient: string | IStellarClient,
-  dbClient?: any
+  dbClient?: unknown
 ): KeeperJob {
   const job = new KeeperJob(contractId, rpcUrlOrClient, dbClient);
   job.start(schedule);

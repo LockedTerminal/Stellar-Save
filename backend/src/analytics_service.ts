@@ -1,7 +1,7 @@
+import { CACHE_TTL_SECONDS } from './lib/cache-config';
+import { CacheKeyBuilder } from './lib/cache-key-builder';
 import { logger } from './logger';
 import * as redis from './redis';
-import { CacheKeyBuilder } from './lib/cache-key-builder';
-import { CACHE_TTL_SECONDS } from './lib/cache-config';
 
 import type { PrismaClient } from '@prisma/client';
 
@@ -703,11 +703,14 @@ export class AnalyticsService {
         select: { data: true },
       });
 
-      const totalContributed = contributionEvents.reduce((sum: number, event: { data: unknown }) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON field is typed as unknown; amount shape is an open-ended contract blob
-        const amount = Number((event.data as any)?.amount ?? 0);
-        return sum + (isNaN(amount) ? 0 : amount);
-      }, 0);
+      const totalContributed = contributionEvents.reduce(
+        (sum: number, event: { data: unknown }) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma JSON field is typed as unknown; amount shape is an open-ended contract blob
+          const amount = Number((event.data as any)?.amount ?? 0);
+          return sum + (isNaN(amount) ? 0 : amount);
+        },
+        0
+      );
 
       // 3. Active members — count unique member addresses from member_joined events.
       //    We group by the `data->>'memberAddress'` field. Since Prisma doesn't support
@@ -720,7 +723,7 @@ export class AnalyticsService {
 
       const uniqueAddresses = new Set<string>();
       for (const event of memberEvents) {
-        const address = (event.data as any)?.memberAddress;
+        const address = (event.data as { memberAddress?: unknown } | null)?.memberAddress;
         if (address && typeof address === 'string') {
           uniqueAddresses.add(address);
         }
